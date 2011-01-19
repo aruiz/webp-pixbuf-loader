@@ -1,4 +1,5 @@
 /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*- */
+
 /* GdkPixbuf library - WebP Image Loader
  *
  * Copyright (C) 2011 Alberto Ruiz
@@ -20,11 +21,12 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
- 
-#include "config.h"
-#include <stdio.h>
+
 #include <webp/decode.h>
-#include "gdk-pixbuf-private.h"
+
+#define GDK_PIXBUF_ENABLE_BACKEND
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#undef  GDK_PIXBUF_ENABLE_BACKEND
 
 static void
 destroy_data (guchar *pixels, gpointer data)
@@ -42,7 +44,7 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
   
   /* Get data size */
   fseek(f, 0, SEEK_END);
-  data_size = ftell(in);
+  data_size = ftell(f);
   fseek(f, 0, SEEK_SET);
   
   /* Get data */
@@ -67,7 +69,7 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
 
   /*FIXME: libwebp does not support alpha channel detection, once supported
    * we need to make the alpha channel conditional to save memory if possible */
-  pixbuf = gdk_pixbuf_new_from_data (out,
+  pixbuf = gdk_pixbuf_new_from_data ((const guchar *)out,
                                      GDK_COLORSPACE_RGB,
                                      TRUE ,
                                      8,
@@ -75,24 +77,20 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
                                      destroy_data,
                                      NULL);
   return;
-  
 }
 
-#ifndef INCLUDE_webp
-#define MODULE_ENTRY(function) G_MODULE_EXPORT void function
-#else
-#define MODULE_ENTRY(function) void _gdk_pixbuf__webp_ ## function
-#endif
-
-MODULE_ENTRY (fill_vtable) (GdkPixbufModule *module)
+void
+fill_vtable (GdkPixbufModule *module)
 {
         module->load = gdk_pixbuf__webp_image_load;
 }
 
-MODULE_ENTRY (fill_info) (GdkPixbufFormat *info)
+void
+fill_info (GdkPixbufFormat *info)
 {
+  /* WebP TODO: figure out how to represent the full pattern */
   static GdkPixbufModulePattern signature[] = {
-    { "RIFF", NULL, 100 }, /* WebP TODO: figure out how to represent the full pattern */
+    { "RIFF", NULL, 100 },
     { NULL, NULL, 0 }
   };
 
