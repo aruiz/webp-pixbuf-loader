@@ -1,5 +1,3 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*- */
-
 /* GdkPixbuf library - WebP Image Loader
  *
  * Copyright (C) 2011 Alberto Ruiz
@@ -106,7 +104,7 @@ fill_info (GdkPixbufFormat *info)
 
   info->name        = "webp";
   info->signature   = signature;
-  info->description = _("The WebP image format");
+  info->description = "The WebP image format";
   info->mime_types  = mime_types;
   info->extensions  = extensions;
   info->flags       = GDK_PIXBUF_FORMAT_THREADSAFE;
