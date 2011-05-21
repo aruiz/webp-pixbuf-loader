@@ -56,7 +56,7 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
     return;
   }
   
-  out = WebPDecodeRGBA(data, data_size, &w, &h);
+  out = WebPDecodeRGB(data, data_size, &w, &h);
   g_free (data);
   
   if (!out)
@@ -69,7 +69,7 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
    * we need to make the alpha channel conditional to save memory if possible */
   pixbuf = gdk_pixbuf_new_from_data ((const guchar *)out,
                                      GDK_COLORSPACE_RGB,
-                                     TRUE ,
+                                     FALSE ,
                                      8,
                                      w, h, 0,
                                      destroy_data,
