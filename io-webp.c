@@ -72,7 +72,8 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
                                      GDK_COLORSPACE_RGB,
                                      FALSE ,
                                      8,
-                                     w, h, w,
+                                     w, h,
+                                     3 * w,
                                      destroy_data,
                                      NULL);
   return;
