@@ -36,7 +36,8 @@ static GdkPixbuf *
 gdk_pixbuf__webp_image_load (FILE *f, GError **error)
 {
   GdkPixbuf * volatile pixbuf = NULL;
-  guint32 data_size, out;
+  guint32 data_size;
+  guint8 *out;
   gint w, h, ok;
   gpointer data;
   
