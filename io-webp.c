@@ -48,7 +48,7 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
   
   /* Get data */
   data = g_malloc(data_size);
-  ok = (fread(data, data_size, 1, f) == 1);
+  ok = (fread(data, 1, data_size, f) == 1);
   fclose(f);
   if (!ok)
   {
