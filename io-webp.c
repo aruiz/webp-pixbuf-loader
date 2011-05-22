@@ -45,18 +45,16 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
   fseek(f, 0, SEEK_END);
   data_size = ftell(f);
   fseek(f, 0, SEEK_SET);
-  
+
   /* Get data */
   data = g_malloc(data_size);
-  ok = (fread(data, 1, data_size, f) == 1);
-  fclose(f);
+  ok = (fread(data, data_size, 1, f) == 1);
   if (!ok)
   {
     /*TODO: Return GError*/
     g_free (data);
     return;
   }
-  
   out = WebPDecodeRGB(data, data_size, &w, &h);
   g_free (data);
   
@@ -76,7 +74,12 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
                                      3 * w,
                                      destroy_data,
                                      NULL);
-  return;
+
+  if (!pixbuf) {
+    /*TODO: Return GError?*/
+    return;
+  }	
+  return pixbuf;
 }
 
 void
