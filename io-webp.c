@@ -1,8 +1,10 @@
 /* GdkPixbuf library - WebP Image Loader
  *
  * Copyright (C) 2011 Alberto Ruiz
+ * Copyright (C) 2011 David Mazary
  *
  * Authors: Alberto Ruiz <aruiz@gnome.org>
+ *          David Mazary <dmaz@vt.edu>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,12 +28,25 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #undef  GDK_PIXBUF_ENABLE_BACKEND
 
+/* Progressive loader context */
+typedef struct {
+        GdkPixbufModuleSizeFunc size_func;
+        GdkPixbufModuleUpdatedFunc update_func;
+        GdkPixbufModulePreparedFunc prepare_func;
+        gpointer user_data;
+        GdkPixbuf *pixbuf;
+        gboolean got_header;
+        WebPIDecoder *idec;
+        GError **error;
+} WebPContext;
+
 static void
 destroy_data (guchar *pixels, gpointer data)
 {
   g_free (pixels);
 }
 
+/* Shared library entry point */
 static GdkPixbuf *
 gdk_pixbuf__webp_image_load (FILE *f, GError **error)
 {
@@ -78,14 +93,103 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
   if (!pixbuf) {
     /*TODO: Return GError?*/
     return;
-  }	
+  }
   return pixbuf;
+}
+
+static gpointer
+gdk_pixbuf__webp_image_begin_load (GdkPixbufModuleSizeFunc size_func,
+                                  GdkPixbufModulePreparedFunc prepare_func,
+                                  GdkPixbufModuleUpdatedFunc update_func,
+                                  gpointer user_data,
+                                  GError **error)
+{
+        WEBP_CSP_MODE mode = MODE_RGB;
+        WebPContext *context = g_new0 (WebPContext, 1);
+        context->size_func = size_func;
+        context->prepare_func = prepare_func;
+        context->update_func  = update_func;
+        context->user_data = user_data;
+        context->idec = WebPINew(mode);
+        return context;
+}
+
+static gboolean
+gdk_pixbuf__webp_image_stop_load (gpointer context, GError **error)
+{
+        WebPContext *data = (WebPContext *) context;
+        g_return_val_if_fail(data != NULL, TRUE);
+        if (data->pixbuf) {
+                g_object_unref (data->pixbuf);
+        }
+        if (data->idec) {
+                WebPIDelete (data->idec);
+        }
+        return TRUE;
+}
+
+static gboolean
+gdk_pixbuf__webp_image_load_increment(gpointer context,
+                                     const guchar *buf, guint size,
+                                     GError **error)
+{
+        gint width, height;
+        WebPContext *data = (WebPContext *) context;
+        g_return_val_if_fail(data != NULL, FALSE);
+
+        /* TODO: Loop while(TRUE), continue on vp8 status suspend */
+        if (!data->got_header) {
+                gint rc;
+                rc = WebPGetInfo (data->user_data, size,
+                                 &width, &height);
+                if (rc == 0) {
+                        /* Header formatting error */
+                }
+                data->got_header = TRUE;
+
+                if (data->size_func) {
+                        (* data->size_func) (&width, &height,
+                                             data->user_data);
+                }
+
+                /* TODO: Initialize pixbuf using width and height */
+
+                if (data->prepare_func) {
+                        (* data->prepare_func) (data->pixbuf,
+                                                NULL,
+                                                data->user_data);
+                }
+                return TRUE;
+        }
+
+        VP8StatusCode status = WebPIUpdate (data->idec, (guchar *) buf, size);
+        printf("Updated buffer with code %d\n", status);
+        if (status == VP8_STATUS_SUSPENDED) {
+                if (data->update_func) {
+                        (* data->update_func) (data->pixbuf, 0, 0,
+                                               width,
+                                               height,
+                                               data->user_data);
+                }
+                return TRUE;
+        }
+        g_return_val_if_fail (status == VP8_STATUS_OK, FALSE);
+        if (data->update_func) {
+                (* data->update_func) (data->pixbuf, 0, 0,
+                                       width,
+                                       height,
+                                       data->user_data);
+        }
+        return TRUE;
 }
 
 void
 fill_vtable (GdkPixbufModule *module)
 {
         module->load = gdk_pixbuf__webp_image_load;
+        module->begin_load = gdk_pixbuf__webp_image_begin_load;
+        module->stop_load = gdk_pixbuf__webp_image_stop_load;
+        module->load_increment = gdk_pixbuf__webp_image_load_increment;
 }
 
 void
