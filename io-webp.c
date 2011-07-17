@@ -23,6 +23,7 @@
  */
 
 #include <webp/decode.h>
+#include <string.h>
 
 #define GDK_PIXBUF_ENABLE_BACKEND
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -37,6 +38,8 @@ typedef struct {
         GdkPixbuf *pixbuf;
         gboolean got_header;
         WebPIDecoder *idec;
+        guchar *decbuf;
+        gint last_y;
         GError **error;
 } WebPContext;
 
@@ -50,67 +53,65 @@ destroy_data (guchar *pixels, gpointer data)
 static GdkPixbuf *
 gdk_pixbuf__webp_image_load (FILE *f, GError **error)
 {
-  GdkPixbuf * volatile pixbuf = NULL;
-  guint32 data_size;
-  guint8 *out;
-  gint w, h, ok;
-  gpointer data;
-  
-  /* Get data size */
-  fseek(f, 0, SEEK_END);
-  data_size = ftell(f);
-  fseek(f, 0, SEEK_SET);
+        GdkPixbuf * volatile pixbuf = NULL;
+        guint32 data_size;
+        guint8 *out;
+        gint w, h, ok;
+        gpointer data;
 
-  /* Get data */
-  data = g_malloc(data_size);
-  ok = (fread(data, data_size, 1, f) == 1);
-  if (!ok)
-  {
-    /*TODO: Return GError*/
-    g_free (data);
-    return;
-  }
-  out = WebPDecodeRGB(data, data_size, &w, &h);
-  g_free (data);
-  
-  if (!out)
-  {
-    /*TODO: Return GError*/
-    return;
-  }
+        /* Get data size */
+        fseek (f, 0, SEEK_END);
+        data_size = ftell(f);
+        fseek (f, 0, SEEK_SET);
 
-  /*FIXME: libwebp does not support alpha channel detection, once supported
-   * we need to make the alpha channel conditional to save memory if possible */
-  pixbuf = gdk_pixbuf_new_from_data ((const guchar *)out,
-                                     GDK_COLORSPACE_RGB,
-                                     FALSE ,
-                                     8,
-                                     w, h,
-                                     3 * w,
-                                     destroy_data,
-                                     NULL);
+        /* Get data */
+        data = g_malloc (data_size);
+        ok = (fread (data, data_size, 1, f) == 1);
+        if (!ok)
+        {
+                /*TODO: Return GError*/
+                g_free (data);
+                return;
+        }
+        out = WebPDecodeRGB (data, data_size, &w, &h);
+        g_free (data);
 
-  if (!pixbuf) {
-    /*TODO: Return GError?*/
-    return;
-  }
-  return pixbuf;
+        if (!out)
+        {
+                /*TODO: Return GError*/
+                return;
+        }
+
+        /*FIXME: libwebp does not support alpha channel detection, once supported
+        * we need to make the alpha channel conditional to save memory if possible */
+        pixbuf = gdk_pixbuf_new_from_data ((const guchar *)out,
+                                           GDK_COLORSPACE_RGB,
+                                           FALSE ,
+                                           8,
+                                           w, h,
+                                           3 * w,
+                                           destroy_data,
+                                           NULL);
+
+        if (!pixbuf) {
+                /*TODO: Return GError?*/
+                return;
+        }
+        return pixbuf;
 }
 
 static gpointer
 gdk_pixbuf__webp_image_begin_load (GdkPixbufModuleSizeFunc size_func,
-                                  GdkPixbufModulePreparedFunc prepare_func,
-                                  GdkPixbufModuleUpdatedFunc update_func,
-                                  gpointer user_data,
-                                  GError **error)
+                                   GdkPixbufModulePreparedFunc prepare_func,
+                                   GdkPixbufModuleUpdatedFunc update_func,
+                                   gpointer user_data,
+                                   GError **error)
 {
-        WEBP_CSP_MODE mode = MODE_RGB;
         WebPContext *context = g_new0 (WebPContext, 1);
         context->size_func = size_func;
         context->prepare_func = prepare_func;
         context->update_func  = update_func;
         context->user_data = user_data;
-        context->idec = WebPINew(mode);
         return context;
 }
 
@@ -125,59 +126,99 @@ gdk_pixbuf__webp_image_stop_load (gpointer context, GError **error)
         if (data->idec) {
                 WebPIDelete (data->idec);
         }
+        if (data->decbuf) {
+                g_free (data->decbuf);
+        }
         return TRUE;
 }
 
 static gboolean
-gdk_pixbuf__webp_image_load_increment(gpointer context,
-                                     const guchar *buf, guint size,
-                                     GError **error)
+gdk_pixbuf__webp_image_load_increment (gpointer context,
+                                       const guchar *buf, guint size,
+                                       GError **error)
 {
-        gint width, height;
+        gint width, height, stride, i, j;
+        guchar *dptr;
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, FALSE);
 
-        /* TODO: Loop while(TRUE), continue on vp8 status suspend */
         if (!data->got_header) {
                 gint rc;
-                rc = WebPGetInfo (data->user_data, size,
-                                 &width, &height);
+                rc = WebPGetInfo (buf, size, &width, &height);
                 if (rc == 0) {
-                        /* Header formatting error */
+                        g_set_error (error,
+                                     GDK_PIXBUF_ERROR,
+                                     GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                                     "Cannot read WebP image header.");
+                        return FALSE;
                 }
                 data->got_header = TRUE;
-
                 if (data->size_func) {
                         (* data->size_func) (&width, &height,
                                              data->user_data);
                 }
-
-                /* TODO: Initialize pixbuf using width and height */
-
+                data->pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB,
+                                               FALSE,
+                                               8,
+                                               width,
+                                               height);
+                data->decbuf = g_try_malloc (width * height * 3);
+                if (!data->decbuf) {
+                        g_set_error (error,
+                                     GDK_PIXBUF_ERROR,
+                                     GDK_PIXBUF_ERROR_INSUFFICIENT_MEMORY,
+                                     "Cannot allocate memory for decoded image data.");
+                        return FALSE;
+                }
+                data->idec = WebPINewRGB (MODE_RGB,
+                                          data->decbuf,
+                                          width * height * 3,
+                                          width * 3);
+                if (!data->idec) {
+                        g_set_error (error,
+                                     GDK_PIXBUF_ERROR,
+                                     GDK_PIXBUF_ERROR_FAILED,
+                                     "Cannot create WebP decoder.");
+                        return FALSE;
+                }
                 if (data->prepare_func) {
                         (* data->prepare_func) (data->pixbuf,
                                                 NULL,
                                                 data->user_data);
                 }
-                return TRUE;
         }
-
-        VP8StatusCode status = WebPIUpdate (data->idec, (guchar *) buf, size);
-        printf("Updated buffer with code %d\n", status);
-        if (status == VP8_STATUS_SUSPENDED) {
-                if (data->update_func) {
-                        (* data->update_func) (data->pixbuf, 0, 0,
-                                               width,
-                                               height,
-                                               data->user_data);
+        const VP8StatusCode status = WebPIAppend (data->idec, buf, size);
+        if (status != VP8_STATUS_SUSPENDED && status != VP8_STATUS_OK) {
+                g_set_error (error,
+                             GDK_PIXBUF_ERROR,
+                             GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                             "WebP decoder failed with status code %d.",
+                             status);
+                return FALSE;
+        }
+        guint8 *dec_output;
+        dec_output = WebPIDecGetRGB (data->idec, &data->last_y, &width, &height, &stride);
+        if (dec_output == NULL && status != VP8_STATUS_SUSPENDED) {
+                g_set_error(error,
+                            GDK_PIXBUF_ERROR,
+                            GDK_PIXBUF_ERROR_BAD_OPTION,
+                            "Bad inputs to WebP decoder.");
+                return FALSE;
+        }
+        dptr = gdk_pixbuf_get_pixels (data->pixbuf);
+        guint8 *row;
+        for (i = 0; i < data->last_y; ++i) {
+                row = dec_output + (i * stride);
+                for (j = 0; j < width/2; j += 3) {
+                        dptr[i * stride + j + 0] = row[j + 0];
+                        dptr[i * stride + j + 1] = row[j + 1];
+                        dptr[i * stride + j + 2] = row[j + 2];
                 }
-                return TRUE;
         }
-        g_return_val_if_fail (status == VP8_STATUS_OK, FALSE);
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
                                        width,
-                                       height,
+                                       data->last_y,
                                        data->user_data);
         }
         return TRUE;
@@ -195,27 +236,27 @@ fill_vtable (GdkPixbufModule *module)
 void
 fill_info (GdkPixbufFormat *info)
 {
-  /* WebP TODO: figure out how to represent the full pattern */
-  static GdkPixbufModulePattern signature[] = {
-    { "RIFF", NULL, 100 },
-    { NULL, NULL, 0 }
-  };
+        /* WebP TODO: figure out how to represent the full pattern */
+        static GdkPixbufModulePattern signature[] = {
+                { "RIFF", NULL, 100 },
+                { NULL, NULL, 0 }
+        };
 
-  static gchar *mime_types[] = {
-    "image/webp",
-    NULL
-  };
+        static gchar *mime_types[] = {
+                "image/webp",
+                NULL
+        };
 
-  static gchar *extensions[] = {
-    "webp",
-    NULL
-  };
+        static gchar *extensions[] = {
+                "webp",
+                NULL
+        };
 
-  info->name        = "webp";
-  info->signature   = signature;
-  info->description = "The WebP image format";
-  info->mime_types  = mime_types;
-  info->extensions  = extensions;
-  info->flags       = GDK_PIXBUF_FORMAT_THREADSAFE;
-  info->license     = "LGPL";
+        info->name        = "webp";
+        info->signature   = signature;
+        info->description = "The WebP image format";
+        info->mime_types  = mime_types;
+        info->extensions  = extensions;
+        info->flags       = GDK_PIXBUF_FORMAT_THREADSAFE;
+        info->license     = "LGPL";
 }
