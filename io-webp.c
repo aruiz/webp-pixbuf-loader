@@ -229,9 +229,8 @@ fill_vtable (GdkPixbufModule *module)
 void
 fill_info (GdkPixbufFormat *info)
 {
-        /* WebP TODO: figure out how to represent the full pattern */
         static GdkPixbufModulePattern signature[] = {
-                { "RIFF", NULL, 100 },
+                { "RIFFsizeWEBP", "    xxxx    ", 100 },
                 { NULL, NULL, 0 }
         };
 
