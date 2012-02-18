@@ -207,7 +207,18 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 return FALSE;
         }
         dptr = gdk_pixbuf_get_pixels (data->pixbuf);
-        g_memmove (dptr, dec_output, data->last_y * stride);
+        guint8 *row, *p, offset;
+        offset = w % 4;  /* decoded width will be divisible by 4 */
+        for (y = 0; y < data->last_y; ++y) {
+                row = dec_output + y * stride;
+                for (x = 0; x < stride; x += stride / w) {
+                        p = dptr + y * stride + x;
+                        p[0] = row[x + 0];
+                        p[1] = row[x + 1];
+                        p[2] = row[x + 2];
+                }
+                dptr += offset;
+        }
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
                                        w,
