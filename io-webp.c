@@ -137,8 +137,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                        const guchar *buf, guint size,
                                        GError **error)
 {
-        gint w, h, stride, x, y;
-        guchar *dptr;
+        gint w, h, stride;
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, FALSE);
 
@@ -188,6 +187,8 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                                 data->user_data);
                 }
         }
+
+        /* Append size bytes to decoder's buffer */
         const VP8StatusCode status = WebPIAppend (data->idec, buf, size);
         if (status != VP8_STATUS_SUSPENDED && status != VP8_STATUS_OK) {
                 g_set_error (error,
@@ -197,6 +198,8 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                              status);
                 return FALSE;
         }
+
+        /* Decode decoder's updated buffer */
         guint8 *dec_output;
         dec_output = WebPIDecGetRGB (data->idec, &data->last_y, &w, &h, &stride);
         if (dec_output == NULL && status != VP8_STATUS_SUSPENDED) {
@@ -206,19 +209,17 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                             "Bad inputs to WebP decoder.");
                 return FALSE;
         }
+
+        /* Copy decoder output to pixbuf */
+        gint y, row;
+        guchar *dptr;
         dptr = gdk_pixbuf_get_pixels (data->pixbuf);
-        guint8 *row, *p, channels;
         const guint8 offset = w % 4;  /* decoded width will be divisible by 4 */
-        channels = stride / w;
         for (y = 0; y < data->last_y; ++y, dptr += offset) {
-                row = dec_output + y * stride;
-                for (x = 0; x < stride; x += channels) {
-                        p = dptr + y * stride + x;
-                        p[0] = row[x + 0];
-                        p[1] = row[x + 1];
-                        p[2] = row[x + 2];
-                }
+                row = y * stride;
+                g_memmove (dptr + row, dec_output + row, stride);
         }
+        
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
                                        w,
