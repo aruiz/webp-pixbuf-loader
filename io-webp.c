@@ -137,14 +137,14 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                        const guchar *buf, guint size,
                                        GError **error)
 {
-        gint width, height, stride, x, y;
+        gint w, h, stride, x, y;
         guchar *dptr;
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, FALSE);
 
         if (!data->got_header) {
                 gint rc;
-                rc = WebPGetInfo (buf, size, &width, &height);
+                rc = WebPGetInfo (buf, size, &w, &h);
                 if (rc == 0) {
                         g_set_error (error,
                                      GDK_PIXBUF_ERROR,
@@ -152,18 +152,18 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                      "Cannot read WebP image header.");
                         return FALSE;
                 }
-                stride = width * 3;  /* TODO Update when alpha support released */
+                stride = w * 3;  /* TODO Update when alpha support released */
                 data->got_header = TRUE;
                 if (data->size_func) {
-                        (* data->size_func) (&width, &height,
+                        (* data->size_func) (&w, &h,
                                              data->user_data);
                 }
                 data->pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB,
                                                FALSE,
                                                8,
-                                               width,
-                                               height);
-                data->decbuf = g_try_malloc (height * stride);
+                                               w,
+                                               h);
+                data->decbuf = g_try_malloc (h * stride);
                 if (!data->decbuf) {
                         g_set_error (error,
                                      GDK_PIXBUF_ERROR,
@@ -173,7 +173,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 }
                 data->idec = WebPINewRGB (MODE_RGB,
                                           data->decbuf,
-                                          width * height * 3,
+                                          h * stride,
                                           stride);
                 if (!data->idec) {
                         g_set_error (error,
@@ -198,7 +198,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 return FALSE;
         }
         guint8 *dec_output;
-        dec_output = WebPIDecGetRGB (data->idec, &data->last_y, &width, &height, &stride);
+        dec_output = WebPIDecGetRGB (data->idec, &data->last_y, &w, &h, &stride);
         if (dec_output == NULL && status != VP8_STATUS_SUSPENDED) {
                 g_set_error(error,
                             GDK_PIXBUF_ERROR,
@@ -207,10 +207,10 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 return FALSE;
         }
         dptr = gdk_pixbuf_get_pixels (data->pixbuf);
-        g_memmove(dptr, dec_output, data->last_y * stride);
+        g_memmove (dptr, dec_output, data->last_y * stride);
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
-                                       width,
+                                       w,
                                        data->last_y,
                                        data->user_data);
         }
