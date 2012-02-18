@@ -138,7 +138,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                        GError **error)
 {
         gint width, height, stride, x, y;
-        guchar *dptr, *p;
+        guchar *dptr;
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, FALSE);
 
@@ -152,6 +152,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                      "Cannot read WebP image header.");
                         return FALSE;
                 }
+                stride = width * 3;  /* TODO Update when alpha support released */
                 data->got_header = TRUE;
                 if (data->size_func) {
                         (* data->size_func) (&width, &height,
@@ -162,7 +163,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                                8,
                                                width,
                                                height);
-                data->decbuf = g_try_malloc (width * height * 3);
+                data->decbuf = g_try_malloc (height * stride);
                 if (!data->decbuf) {
                         g_set_error (error,
                                      GDK_PIXBUF_ERROR,
@@ -172,8 +173,8 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 }
                 data->idec = WebPINewRGB (MODE_RGB,
                                           data->decbuf,
-                                          width * height * 3,
-                                          width * 3);
+                                          width * height * 8,
+                                          stride);
                 if (!data->idec) {
                         g_set_error (error,
                                      GDK_PIXBUF_ERROR,
@@ -206,17 +207,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 return FALSE;
         }
         dptr = gdk_pixbuf_get_pixels (data->pixbuf);
-        guint8 *row;
-        for (y = 0; y < data->last_y; ++y) {
-                row = dec_output + y * stride;
-                for (x = 0; x < width; ++x) {
-                        p = dptr + y * stride + x * 3;
-                        p[0] = row[3 * x + 0];
-                        p[1] = row[3 * x + 1];
-                        p[2] = row[3 * x + 2];
-                }
-                dptr += 2;
-        }
+        g_memmove(dptr, dec_output, data->last_y * stride);
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
                                        width,
