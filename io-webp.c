@@ -23,6 +23,7 @@
  */
 
 #include <webp/decode.h>
+#include <webp/encode.h>
 #include <string.h>
 
 #define GDK_PIXBUF_ENABLE_BACKEND
@@ -205,7 +206,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
         if (dec_output == NULL && status != VP8_STATUS_SUSPENDED) {
                 g_set_error(error,
                             GDK_PIXBUF_ERROR,
-                            GDK_PIXBUF_ERROR_BAD_OPTION,
+                            GDK_PIXBUF_ERROR_FAILED,
                             "Bad inputs to WebP decoder.");
                 return FALSE;
         }
@@ -229,6 +230,167 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
         return TRUE;
 }
 
+static int
+write_file (const uint8_t* data, size_t data_size, const WebPPicture* const pic)
+{
+        FILE* const out = (FILE *) pic->custom_ptr;
+        return data_size ? (fwrite (data, data_size, 1, out) == 1) : 1;
+}
+
+typedef struct {
+        GdkPixbufSaveFunc func;
+        gpointer          data;
+} save_context;
+
+static int
+save_callback (const uint8_t* data, size_t data_size, const WebPPicture* const pic)
+{
+        save_context *env = (save_context *) pic->custom_ptr;
+        return (* env->func) (env->data, data_size, NULL, (gpointer) data);
+}
+
+static gboolean
+real_save_webp (GdkPixbuf        *pixbuf,
+                gchar           **keys,
+                gchar           **values,
+                GError          **error,
+                gboolean          to_callback,
+                FILE             *f,
+                save_context     *context)
+{
+        WebPPicture picture;
+        WebPConfig config;
+        gint w, h, rowstride, has_alpha, bpc, num_keys, rc;
+        guchar *pixels;
+
+        if (!WebPPictureInit(&picture) || !WebPConfigInit(&config)) {
+                g_set_error(error,
+                            GDK_PIXBUF_ERROR,
+                            GDK_PIXBUF_ERROR_BAD_OPTION,
+                            "WebP encoder version mismatch.");
+                return FALSE;
+        }
+
+        if (keys && *keys) {
+                gchar **kiter = keys;
+                gchar **viter = values;
+
+                while (*kiter) {
+                        if (strncmp (*kiter, "quality", 7) == 0) {
+                                float quality = (float) g_ascii_strtod (*viter, NULL);
+                                if (quality < 0 || quality > 100) {
+                                        g_set_error (error,
+                                                     GDK_PIXBUF_ERROR,
+                                                     GDK_PIXBUF_ERROR_BAD_OPTION,
+                                                     "WebP quality must be a value between 0 and 100.");
+                                        return FALSE;                                
+                                }
+                                config.quality = quality;
+                        } else if (strncmp (*kiter, "preset", 6) == 0) {
+                                WebPPreset preset;
+                                if (strncmp (*viter, "default", 7) == 0) {
+                                        preset = WEBP_PRESET_DEFAULT;
+                                } else if (strncmp (*viter, "photo", 5) == 0) {
+                                        preset = WEBP_PRESET_PHOTO;
+                                } else if (strncmp (*viter, "picture", 7) == 0) {
+                                        preset = WEBP_PRESET_PICTURE;
+                                } else if (strncmp (*viter, "drawing", 7) == 0) {
+                                        preset = WEBP_PRESET_DRAWING;
+                                } else if (strncmp (*viter, "icon", 4) == 0) {
+                                        preset = WEBP_PRESET_ICON;
+                                } else if (strncmp (*viter, "text", 4) == 0) {
+                                        preset = WEBP_PRESET_TEXT;
+                                } else {
+                                        g_set_error (error,
+                                                     GDK_PIXBUF_ERROR,
+                                                     GDK_PIXBUF_ERROR_BAD_OPTION,
+                                                     "WebP encoder invalid preset.");
+                                        return FALSE;
+                                }
+                                if (WebPConfigPreset (&config, preset, config.quality) == 0) {
+                                         g_set_error (error,
+                                                      GDK_PIXBUF_ERROR,
+                                                      GDK_PIXBUF_ERROR_FAILED,
+                                                      "Could not initialize decoder with preset.");
+                                         return FALSE;
+                                }
+                        }
+                        ++kiter;
+                        ++viter;
+                }
+        }
+
+        if (WebPValidateConfig (&config) != 1) {
+                g_set_error (error,
+                             GDK_PIXBUF_ERROR,
+                             GDK_PIXBUF_ERROR_BAD_OPTION,
+                             "Invalid encoding configuration");
+                return FALSE;
+        }
+
+        w = gdk_pixbuf_get_width (pixbuf);
+        h = gdk_pixbuf_get_height (pixbuf);
+        rowstride = gdk_pixbuf_get_rowstride (pixbuf);
+        has_alpha = gdk_pixbuf_get_has_alpha (pixbuf);
+        pixels = gdk_pixbuf_get_pixels (pixbuf);
+
+        picture.width = w;
+        picture.height = h;
+
+        if (has_alpha) {
+                rc = WebPPictureImportRGBA (&picture, pixels, rowstride);
+        } else {
+                rc = WebPPictureImportRGB (&picture, pixels, rowstride);
+        }
+        if (rc == 0) {
+                g_set_error (error,
+                             GDK_PIXBUF_ERROR,
+                             GDK_PIXBUF_ERROR_INSUFFICIENT_MEMORY,
+                             "Failed to allocate picture");
+                return FALSE;
+        }
+
+        if (to_callback) {
+                picture.writer = save_callback;
+                picture.custom_ptr = (void*) context;
+        } else {
+                picture.writer = write_file;
+                picture.custom_ptr = (void*) f;
+        }
+
+        if (WebPEncode(&config, &picture) == 0) {
+                fprintf(stderr, "Error! Cannot encode picture as WebP\n");
+        }
+
+        return TRUE;
+}
+
+static gboolean
+gdk_pixbuf__webp_image_save (FILE          *f,
+                             GdkPixbuf     *pixbuf,
+                             gchar        **keys,
+                             gchar        **values,
+                             GError       **error)
+{
+        return real_save_webp (pixbuf, keys, values, error,
+                               FALSE, f, NULL);
+}
+
+static gboolean
+gdk_pixbuf__webp_image_save_to_callback (GdkPixbufSaveFunc   save_func,
+                                         gpointer            user_data,
+                                         GdkPixbuf          *pixbuf,
+                                         gchar             **keys,
+                                         gchar             **values,
+                                         GError            **error)
+{
+        save_context *context = g_new0 (save_context, 1);
+        context->func = save_func;
+        context->data = user_data;
+        return real_save_webp (pixbuf, keys, values, error,
+                               TRUE, NULL, context);
+}
+
 void
 fill_vtable (GdkPixbufModule *module)
 {
@@ -236,6 +398,8 @@ fill_vtable (GdkPixbufModule *module)
         module->begin_load = gdk_pixbuf__webp_image_begin_load;
         module->stop_load = gdk_pixbuf__webp_image_stop_load;
         module->load_increment = gdk_pixbuf__webp_image_load_increment;
+        module->save = gdk_pixbuf__webp_image_save;
+        module->save_to_callback = gdk_pixbuf__webp_image_save_to_callback;
 }
 
 void
@@ -262,6 +426,6 @@ fill_info (GdkPixbufFormat *info)
         info->description = "The WebP image format";
         info->mime_types  = mime_types;
         info->extensions  = extensions;
-        info->flags       = GDK_PIXBUF_FORMAT_THREADSAFE;
+        info->flags       = GDK_PIXBUF_FORMAT_WRITABLE | GDK_PIXBUF_FORMAT_THREADSAFE;
         info->license     = "LGPL";
 }
