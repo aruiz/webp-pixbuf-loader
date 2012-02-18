@@ -173,7 +173,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 }
                 data->idec = WebPINewRGB (MODE_RGB,
                                           data->decbuf,
-                                          width * height * 8,
+                                          width * height * 3,
                                           stride);
                 if (!data->idec) {
                         g_set_error (error,
