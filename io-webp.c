@@ -137,8 +137,8 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                        const guchar *buf, guint size,
                                        GError **error)
 {
-        gint width, height, stride, i, j;
-        guchar *dptr;
+        gint width, height, stride, x, y;
+        guchar *dptr, *p;
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, FALSE);
 
@@ -207,13 +207,15 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
         }
         dptr = gdk_pixbuf_get_pixels (data->pixbuf);
         guint8 *row;
-        for (i = 0; i < data->last_y; ++i) {
-                row = dec_output + (i * stride);
-                for (j = 0; j < width/2; j += 3) {
-                        dptr[i * stride + j + 0] = row[j + 0];
-                        dptr[i * stride + j + 1] = row[j + 1];
-                        dptr[i * stride + j + 2] = row[j + 2];
+        for (y = 0; y < data->last_y; ++y) {
+                row = dec_output + y * stride;
+                for (x = 0; x < width; ++x) {
+                        p = dptr + y * stride + x * 3;
+                        p[0] = row[3 * x + 0];
+                        p[1] = row[3 * x + 1];
+                        p[2] = row[3 * x + 2];
                 }
+                dptr += 2;
         }
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
@@ -244,6 +246,7 @@ fill_info (GdkPixbufFormat *info)
 
         static gchar *mime_types[] = {
                 "image/webp",
+                "audio/x-riff", /* FIXME hack around systems missing mime type */
                 NULL
         };
 
