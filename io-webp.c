@@ -45,7 +45,7 @@ typedef struct {
 static void
 destroy_data (guchar *pixels, gpointer data)
 {
-	g_free (pixels);
+        g_free (pixels);
 }
 
 /* Shared library entry point */
