@@ -26,9 +26,7 @@
 #include <webp/encode.h>
 #include <string.h>
 
-#define GDK_PIXBUF_ENABLE_BACKEND
 #include <gdk-pixbuf/gdk-pixbuf.h>
-#undef  GDK_PIXBUF_ENABLE_BACKEND
 
 /* Progressive loader context */
 typedef struct {
@@ -47,7 +45,7 @@ typedef struct {
 static void
 destroy_data (guchar *pixels, gpointer data)
 {
-  g_free (pixels);
+	g_free (pixels);
 }
 
 /* Shared library entry point */
@@ -68,19 +66,22 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
         /* Get data */
         data = g_malloc (data_size);
         ok = (fread (data, data_size, 1, f) == 1);
-        if (!ok)
-        {
-                /*TODO: Return GError*/
-                g_free (data);
-                return;
+        if (!ok) {
+                g_set_error (error,
+                             GDK_PIXBUF_ERROR,
+                             GDK_PIXBUF_ERROR_FAILED,
+                             "Failed to read file");
+                return FALSE;
         }
         out = WebPDecodeRGB (data, data_size, &w, &h);
         g_free (data);
 
-        if (!out)
-        {
-                /*TODO: Return GError*/
-                return;
+        if (!out) {
+                g_set_error (error,
+                             GDK_PIXBUF_ERROR,
+                             GDK_PIXBUF_ERROR_FAILED,
+                             "Cannot create WebP decoder.");
+                return FALSE;
         }
 
         /*FIXME: libwebp does not support alpha channel detection, once supported
@@ -95,8 +96,11 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
                                            NULL);
 
         if (!pixbuf) {
-                /*TODO: Return GError?*/
-                return;
+                g_set_error (error,
+                             GDK_PIXBUF_ERROR,
+                             GDK_PIXBUF_ERROR_FAILED,
+                             "Failed to decode image");
+                return FALSE;
         }
         return pixbuf;
 }
@@ -260,7 +264,7 @@ real_save_webp (GdkPixbuf        *pixbuf,
 {
         WebPPicture picture;
         WebPConfig config;
-        gint w, h, rowstride, has_alpha, bpc, num_keys, rc;
+        gint w, h, rowstride, has_alpha, rc;
         guchar *pixels;
 
         if (!WebPPictureInit(&picture) || !WebPConfigInit(&config)) {
