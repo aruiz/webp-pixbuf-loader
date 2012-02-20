@@ -26,7 +26,9 @@
 #include <webp/encode.h>
 #include <string.h>
 
+#define GDK_PIXBUF_ENABLE_BACKEND
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#undef  GDK_PIXBUF_ENABLE_BACKEND
 
 /* Progressive loader context */
 typedef struct {
