@@ -226,7 +226,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                 row = y * stride;
                 g_memmove (dptr + row, dec_output + row, stride);
         }
-        
+
         if (data->update_func) {
                 (* data->update_func) (data->pixbuf, 0, 0,
                                        w,
@@ -289,7 +289,7 @@ real_save_webp (GdkPixbuf        *pixbuf,
                                                      GDK_PIXBUF_ERROR,
                                                      GDK_PIXBUF_ERROR_BAD_OPTION,
                                                      "WebP quality must be a value between 0 and 100.");
-                                        return FALSE;                                
+                                        return FALSE;
                                 }
                                 config.quality = quality;
                         } else if (strncmp (*kiter, "preset", 6) == 0) {
