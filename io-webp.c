@@ -62,6 +62,8 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
         guint8 *out;
         gint w, h, ok;
         gpointer data;
+        WebPBitstreamFeatures features;
+        gboolean use_alpha = TRUE;
 
         /* Get data size */
         fseek (f, 0, SEEK_END);
@@ -78,7 +80,19 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
                              "Failed to read file");
                 return FALSE;
         }
-        out = WebPDecodeRGB (data, data_size, &w, &h);
+
+        /* Take the safe route and only disable the alpha channel when
+           we're sure that there is not any. */
+        if (WebPGetFeatures (data, data_size, &features) == VP8_STATUS_OK
+            && features.has_alpha == FALSE) {
+                use_alpha = FALSE;
+        }
+
+        if (use_alpha) {
+                out = WebPDecodeRGBA (data, data_size, &w, &h);
+        } else {
+                out = WebPDecodeRGB (data, data_size, &w, &h);
+        }
         g_free (data);
 
         if (!out) {
@@ -89,14 +103,12 @@ gdk_pixbuf__webp_image_load (FILE *f, GError **error)
                 return FALSE;
         }
 
-        /*FIXME: libwebp does not support alpha channel detection, once supported
-        * we need to make the alpha channel conditional to save memory if possible */
         pixbuf = gdk_pixbuf_new_from_data ((const guchar *)out,
                                            GDK_COLORSPACE_RGB,
-                                           FALSE ,
+                                           use_alpha,
                                            8,
                                            w, h,
-                                           3 * w,
+                                           w * (use_alpha ? 4 : 3),
                                            destroy_data,
                                            NULL);
 
@@ -182,6 +194,9 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
 
         if (!data->got_header) {
                 gint rc;
+                WebPBitstreamFeatures features;
+                gboolean use_alpha = TRUE;
+
                 rc = WebPGetInfo (buf, size, &w, &h);
                 if (rc == 0) {
                         g_set_error (error,
@@ -207,12 +222,19 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                         h = scaled_h;
                 }
 
-                stride = w * 3;  /* TODO Update when alpha support released */
+                /* Take the safe route and only disable the alpha channel when
+                   we're sure that there is not any. */
+                if (WebPGetFeatures (buf, size, &features) == VP8_STATUS_OK
+                    && features.has_alpha == FALSE) {
+                        use_alpha = FALSE;
+                }
+
                 data->pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB,
-                                               FALSE,
+                                               use_alpha,
                                                8,
                                                w,
                                                h);
+                stride = gdk_pixbuf_get_rowstride (data->pixbuf);
 
                 data->decbuf = g_try_malloc (h * stride);
                 if (!data->decbuf) {
@@ -223,7 +245,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                         return FALSE;
                 }
 
-                data->idec = new_rgb_decoder (MODE_RGB,
+                data->idec = new_rgb_decoder (use_alpha ? MODE_RGBA : MODE_RGB,
                                               data->decbuf,
                                               h * stride,
                                               stride,
@@ -266,13 +288,11 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
         }
 
         /* Copy decoder output to pixbuf */
-        gint y, row;
+        gint y, row_offset = 0;
         guchar *dptr;
         dptr = gdk_pixbuf_get_pixels (data->pixbuf);
-        const guint8 offset = w % 4;  /* decoded width will be divisible by 4 */
-        for (y = 0; y < data->last_y; ++y, dptr += offset) {
-                row = y * stride;
-                g_memmove (dptr + row, dec_output + row, stride);
+        for (y = 0; y < data->last_y; ++y, row_offset += stride) {
+                g_memmove (dptr + row_offset, dec_output + row_offset, stride);
         }
 
         if (data->update_func) {
