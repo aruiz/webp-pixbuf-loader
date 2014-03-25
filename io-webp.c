@@ -201,16 +201,25 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                                                w,
                                                h);
 
+                guint pixbuf_length;
                 stride = gdk_pixbuf_get_rowstride (data->pixbuf);
-                guchar *pixel_data = gdk_pixbuf_get_pixels (data->pixbuf);
+                guchar *pixbuf_data = gdk_pixbuf_get_pixels_with_length (data->pixbuf,
+                                                                         &pixbuf_length);
 
                 /* Initialise the picture to transparent black. */
-                memset (pixel_data, 0x00, h * stride);
+                memset (pixbuf_data, 0x00, pixbuf_length);
 
                 data->config.output.colorspace = use_alpha ? MODE_RGBA : MODE_RGB;
                 data->config.output.is_external_memory = TRUE;
-                data->config.output.u.RGBA.rgba = pixel_data;
+                data->config.output.u.RGBA.rgba = pixbuf_data;
                 data->config.output.u.RGBA.stride = stride;
+
+                /* XXX: this may not be true: the last row doesn't strictly have
+                   to include stride padding, even though it does in case of
+                   gdk_pixbuf_new(), looking at its source.  There is an explicit
+                   check in libwebp that requires that the following value equals
+                   stride times height, however, even though it is fairly unlikely
+                   that anyone would actually want to write into the padding. */
                 data->config.output.u.RGBA.size = h * stride;
 
                 data->idec = WebPIDecode (NULL, 0, &data->config);
