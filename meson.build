@@ -8,7 +8,8 @@ webp = dependency('libwebp', version: '>0.4.3')
 
 # -34/-64 is to overcome a Fedora bug in the .pc file
 # debian has a similar problem with its .pc file but it requires knowing the platform triad
-gdk_pb_query_loaders = find_program(gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64')
+
+gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64')
 
 
 pbl_webp = shared_library('pixbufloader-webp', 'io-webp.c',

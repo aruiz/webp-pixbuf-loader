@@ -1,0 +1,1 @@
+option('gdk_pixbuf_query_loaders_path', type: 'string', description: 'A non default path for the gdk-pixbuf-query-loaders binary')
