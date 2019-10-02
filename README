@@ -1,1 +1,10 @@
-WebM GDK Pixbuf Loader library 
+WebM GDK Pixbuf Loader library
+
+To build:
+
+# meson build
+# cd build
+# ninja
+
+To install (on the build/ dir as well):
+# ninja install
