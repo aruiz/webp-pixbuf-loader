@@ -285,7 +285,7 @@ static int
 save_callback (const uint8_t* data, size_t data_size, const WebPPicture* const pic)
 {
         save_context *env = (save_context *) pic->custom_ptr;
-        return (* env->func) (data, data_size, NULL, env->data);
+        return (* env->func) ((const char*)data, data_size, NULL, env->data);
 }
 
 static gboolean
