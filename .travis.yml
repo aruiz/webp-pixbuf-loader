@@ -1,0 +1,14 @@
+os: linux
+dist: bionic
+language: c
+
+before_install:
+  - sudo apt update
+  - sudo apt install ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev
+
+script:
+  - mkdir build
+  - meson build -Dgdk_pixbuf_query_loaders_path=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders
+  - cd build
+  - ninja
+  - ninja test
