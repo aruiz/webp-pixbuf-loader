@@ -15,6 +15,14 @@ pbl_webp = shared_library('pixbufloader-webp', 'io-webp.c',
                           install: true,
                           install_dir: gdk_pb_moddir)
 
+cdata = configuration_data()
+cdata.set('bindir', get_option('prefix') / get_option('bindir'))
+configure_file(input: 'webp-pixbuf.thumbnailer.in',
+               output: 'webp-pixbuf.thumbnailer',
+               configuration: cdata,
+               install: true,
+               install_dir: get_option('datadir') / 'thumbnailer')
+
 meson.add_install_script(gdk_pb_query_loaders.path(), '--update-cache')
 
 subdir('tests')
