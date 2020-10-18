@@ -11,7 +11,13 @@ Building from source
   meson builddir
   ninja -C builddir
   ```
-  
+
+  Build on Debian/Ubuntu:
+  ```
+  meson builddir -Dgdk_pixbuf_query_loaders_path=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders
+  ninja -C builddir
+  ```
+
   Install:
   ```
   sudo ninja -C builddir install
