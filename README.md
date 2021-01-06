@@ -1,4 +1,4 @@
-WebM GDK Pixbuf Loader library
+WebP GDK Pixbuf Loader library
 ==============================
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/webp-pixbuf-loader.svg)](https://repology.org/project/webp-pixbuf-loader/versions)
