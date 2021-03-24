@@ -1,6 +1,9 @@
 project('webp-pixbuf-loader', 'c')
 gdkpb = dependency('gdk-pixbuf-2.0', version: '>2.22.0', method: 'pkg-config')
-gdk_pb_moddir = gdkpb.get_pkgconfig_variable('gdk_pixbuf_moduledir')
+gdk_pb_moddir = get_option('gdk_pixbuf_moduledir')
+if gdk_pb_moddir == ''
+  gdk_pb_moddir = gdkpb.get_pkgconfig_variable('gdk_pixbuf_moduledir')
+endif
 gdk_pb_query_loaders = gdkpb.get_pkgconfig_variable('gdk_pixbuf_query_loaders')
 webp = dependency('libwebp', version: '>0.4.3')
 
