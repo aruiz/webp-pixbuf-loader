@@ -8,29 +8,21 @@
  * Authors: Alberto Ruiz <aruiz@gnome.org>
  *          David Mazary <dmaz@vt.edu>
  *          Přemysl Janouch <p.janouch@gmail.com>
+ *
  */
 
-#include <webp/decode.h>
-#include <webp/encode.h>
-#include <string.h>
+#include "io-webp.h"
 
-#define GDK_PIXBUF_ENABLE_BACKEND
-#include <gdk-pixbuf/gdk-pixbuf.h>
-#undef  GDK_PIXBUF_ENABLE_BACKEND
+#define  IMAGE_READ_BUFFER_SIZE 65535
 
-/* Progressive loader context */
-typedef struct {
-        GdkPixbufModuleSizeFunc size_func;
-        GdkPixbufModuleUpdatedFunc update_func;
-        GdkPixbufModulePreparedFunc prepare_func;
-        WebPDecoderConfig config;
-        gpointer user_data;
-        GdkPixbuf *pixbuf;
-        gboolean got_header;
-        WebPIDecoder *idec;
-        gint last_y;
-        GError **error;
-} WebPContext;
+/* from io-webp-anim.c */
+extern
+GdkPixbufAnimation *gdk_pixbuf__webp_image_load_animation (FILE    *file,
+                                                           GError **error);
+extern
+GdkPixbufAnimation *gdk_pixbuf__webp_image_load_animation_data (const guchar *buf, guint size,
+                                                                WebPContext *in_context,
+                                                                GError **error);
 
 static void
 destroy_data (guchar *pixels, gpointer data)
@@ -136,6 +128,201 @@ gdk_pixbuf__webp_image_stop_load (gpointer context, GError **error)
         return TRUE;
 }
 
+/*
+ * anim_context will contain the new ptr and its size.
+ * newbuf incoming data to add
+ * size of the incoming data
+ * returns the new ptr
+ */
+static gpointer
+realloc_copy_mem(anim_incr_decode *anim_context, const guchar *newbuf, guint size) {
+        guchar *core_data = anim_context->data;
+        size_t core_used_len = anim_context->used_len;
+        size_t core_cur_max_len = anim_context->cur_max_len;
+        size_t size_to_add = IMAGE_READ_BUFFER_SIZE;
+        if (core_data == NULL) {
+                guchar *ptr = g_try_malloc0(core_cur_max_len + size + size_to_add);
+                if (ptr == NULL) {
+                        core_used_len = 0;
+                        core_cur_max_len = 0;
+                } else {
+                        memcpy(ptr, newbuf, size);
+                        core_data = ptr;
+                        core_used_len = size;
+                        core_cur_max_len = size + size_to_add;
+                }
+        } else {  /* (core_data != NULL) */
+                if (core_cur_max_len >= core_used_len + size) {
+                        memcpy(core_data + core_used_len, newbuf, size);
+                        core_used_len += size;
+                } else {
+                        size_t extended_size;
+                        guchar *newptr = g_try_realloc(core_data,
+                                                       core_cur_max_len + size + size_to_add);
+                        extended_size = core_cur_max_len + size + size_to_add;
+                        if (!newptr) {
+                                newptr = g_try_realloc(core_data, core_cur_max_len + size);
+                                extended_size = core_cur_max_len + size;
+                        }
+
+                        if (newptr) {
+                                core_data = newptr;
+                                core_cur_max_len = extended_size;
+                                memcpy(core_data + core_used_len, newbuf, size);
+                                core_used_len += size;
+                        }
+                }
+        }
+
+        anim_context->data = core_data;
+        anim_context->cur_max_len = core_cur_max_len;
+        anim_context->used_len = core_used_len;
+
+        return core_data;
+}
+
+/*
+ * From incoming data in ptr,
+ * creates a GdkPixbufAnimation and GdkPixbufAnimationIter
+ * and stores them in WebPContext* data.
+ */
+static void
+create_anim(WebPContext *data,
+            guchar *ptr, guint size,
+            GError **error) {
+        data->anim_incr.data = ptr;
+        if (data->anim_incr.used_len != data->anim_incr.total_data_len) {
+                return;
+        }
+
+        data->anim_incr.state = AIDstate_have_all_data;
+        GdkPixbufAnimation *anim = gdk_pixbuf__webp_image_load_animation_data(
+                data->anim_incr.data,
+                data->anim_incr.used_len,
+                data,
+                error);
+
+        GdkPixbufAnimationIter *anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
+        GdkPixbuf *pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
+        data->pixbuf = pixbuf;
+        data->anim_incr.state = AIDstate_sending_frames;
+        if (data->prepare_func) {
+                (*data->prepare_func)(data->pixbuf,
+                                      anim,
+                                      data->user_data);
+        }
+}
+
+/* handle animation.
+ * The WebP animation API was not designed for incremental load.
+ * Defeat the purpose of incremental load, by loading all increments
+ * into one data buffer. Do not create a gdk_pixbuf until all data
+ * is present. Then issue data->prepare_func call.
+ */
+static gboolean
+gdk_pixbuf__webp_anim_load_increment(gpointer context,
+                                     const guchar *buf, guint size,
+                                     GError **error) {
+        WebPContext *data = (WebPContext *) context;
+
+        if (data->anim_incr.state == AIDstate_need_initialize) {
+                if (size < 8) {
+                        g_set_error(error,
+                                    GDK_PIXBUF_ERROR,
+                                    GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                                    "Cannot read WebP image header...");
+                        return FALSE;
+                }
+                /* check for "RIFF" tag. */
+                char tag[5];
+                tag[4] = 0;
+                for (int i = 0; i < 4; i++) { tag[i] = *(char *) (buf + i); }
+                int rc2 = strcmp(tag, "RIFF");
+                if (rc2 != 0) {
+                        g_set_error(error,
+                                    GDK_PIXBUF_ERROR,
+                                    GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                                    "Cannot read WebP image header...");
+                        return FALSE;
+                }
+
+                /* The next 4 bytes give the size of the webp container, less the 8 byte header. */
+                uint32_t anim_size = *(uint32_t *) (buf + 4); /* gives file size not counting the first 8 bytes. */
+                uint32_t file_size = anim_size + 8;
+                if (file_size < size) {
+                        /* user asking to insert data larger than the image size set in the file data. */
+                        g_set_error(error,
+                                    GDK_PIXBUF_ERROR,
+                                    GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                                    "Cannot read WebP image header..");
+                        return FALSE;
+                }
+                data->anim_incr.total_data_len = file_size; /* allow for 8 byte header. "RIFF" + SIZE . */
+                guchar *ptr = calloc(sizeof(guchar), file_size);
+                if (ptr == NULL) {
+                        g_set_error(error,
+                                    GDK_PIXBUF_ERROR,
+                                    GDK_PIXBUF_ERROR_INSUFFICIENT_MEMORY,
+                                    "Failed to allocate memory for the WebP image.");
+                        return FALSE;
+
+                }
+                gint w, h;
+                gint rc = WebPGetInfo(buf, size, &w, &h);
+                if (rc == 0) {
+                        g_set_error(error,
+                                    GDK_PIXBUF_ERROR,
+                                    GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                                    "Cannot read WebP image header.");
+                        return FALSE;
+                }
+                data->got_header = TRUE;
+
+                if (data->size_func) {
+                        gint scaled_w = w;
+                        gint scaled_h = h;
+
+                        (*data->size_func)(&scaled_w, &scaled_h,
+                                           data->user_data);
+                        if (scaled_w != w || scaled_h != h) {
+                                data->config.options.use_scaling = TRUE;
+                                data->config.options.scaled_width = scaled_w;
+                                data->config.options.scaled_height = scaled_h;
+                                w = scaled_w;
+                                h = scaled_h;
+                        }
+                }
+
+                (void) memcpy(ptr, buf, size);
+                data->anim_incr.data = ptr;
+                data->anim_incr.used_len = size;
+                data->anim_incr.cur_max_len = anim_size + 8;    /* 8 byte header. */
+                data->anim_incr.total_data_len = anim_size + 8;    /* 8 byte header. */
+                data->anim_incr.state = AIDstate_need_data;
+                if (size == data->anim_incr.total_data_len) {
+                        data->anim_incr.state = AIDstate_have_all_data;
+                        create_anim(data, ptr, size, error);
+                } else if (size > data->anim_incr.total_data_len) {
+                        return FALSE;
+                }
+                return TRUE;
+        } else if (data->anim_incr.state == AIDstate_need_data) {
+                gpointer ptr = realloc_copy_mem(&data->anim_incr, buf, size);
+                if (data->anim_incr.used_len == data->anim_incr.total_data_len) {
+                        data->anim_incr.state = AIDstate_have_all_data;
+                        create_anim(data, ptr, data->anim_incr.used_len, error);
+                } else if (data->anim_incr.used_len > data->anim_incr.total_data_len) {
+                        return FALSE;
+                }
+                return TRUE;
+        } else if (data->anim_incr.state == AIDstate_have_all_data) {
+                return TRUE;
+        } else if (data->anim_incr.state == AIDstate_sending_frames) {
+                return TRUE;
+        }
+        return FALSE;
+}
+
 static gboolean
 gdk_pixbuf__webp_image_load_increment (gpointer context,
                                        const guchar *buf, guint size,
@@ -144,8 +331,13 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
         gint w, h, stride;
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, FALSE);
+        gboolean use_animation = FALSE;
 
-        if (!data->got_header) {
+        if (data->got_header) {
+            if (data->config.input.has_animation) {
+                return gdk_pixbuf__webp_anim_load_increment(context, buf, size, error);
+            }
+        } else {
                 gint rc = WebPGetInfo (buf, size, &w, &h);
                 if (rc == 0) {
                         g_set_error (error,
@@ -176,9 +368,14 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
 
                 /* Take the safe route and only disable the alpha channel when
                    we're sure that there is not any. */
-                if (WebPGetFeatures (buf, size, &features) == VP8_STATUS_OK
-                    && features.has_alpha == FALSE) {
+                if (WebPGetFeatures (buf, size, &features) == VP8_STATUS_OK) {
+                    if (features.has_alpha == FALSE)
                         use_alpha = FALSE;
+                    if (features.has_animation) {
+                        use_animation = TRUE;
+                        data->config.input.has_animation = TRUE;
+                        data->features = features;
+                    }
                 }
 
                 data->pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB,
@@ -207,6 +404,10 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                    stride times height, however, even though it is fairly unlikely
                    that anyone would actually want to write into the padding. */
                 data->config.output.u.RGBA.size = h * stride;
+
+                if (use_animation) {
+                    return gdk_pixbuf__webp_anim_load_increment(context, buf, size, error);
+                }
 
                 data->idec = WebPIDecode (NULL, 0, &data->config);
                 if (!data->idec) {
@@ -425,6 +626,7 @@ fill_vtable (GdkPixbufModule *module)
         module->load_increment = gdk_pixbuf__webp_image_load_increment;
         module->save = gdk_pixbuf__webp_image_save;
         module->save_to_callback = gdk_pixbuf__webp_image_save_to_callback;
+        module->load_animation = gdk_pixbuf__webp_image_load_animation;
 }
 
 void
