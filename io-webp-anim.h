@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: LGPL-2.0-or-later
  * Copyright (C) 2021 Alan Hawrelak
  *
- * Authors: Alan Hawrelak <metpost58@gmail.com>
+ * Authors: Alan Hawrelak <alangh@shaw.ca>
  */
 
 #ifndef IO_WEBP_ANIM_H
@@ -40,15 +40,15 @@ typedef struct _GdkPixbufWebpAnimIter GdkPixbufWebpAnimIter;
 
 /* Private part of the GdkPixbufWebpAnim structure. */
 struct _GdkPixbufWebpAnim {
-        GdkPixbufAnimation parent_instance;
-        WebPContext *context;
-        WebPAnimInfo *animInfo;
-        WebPAnimDecoderOptions *decOptions;
-        WebPAnimDecoder *dec;       /* dec and demuxer have identical lifetimes. Also pdata.bytes? */
-        WebPDemuxer *demuxer;
-        GdkPixbufWebpAnimIter *webp_iter;
-        WebPData pdata;
-        uint32_t loops_completed;
+        GdkPixbufAnimation      parent_instance;
+        WebPContext             *context;
+        WebPAnimInfo            *animInfo;
+        WebPAnimDecoderOptions  *decOptions;
+        WebPAnimDecoder         *dec; /* dec and demuxer have identical lifetimes. Also pdata.bytes? */
+        WebPDemuxer             *demuxer;
+        GdkPixbufWebpAnimIter   *webp_iter;
+        WebPData                pdata;
+        uint32_t                loops_completed;
 };
 
 struct _GdkPixbufWebpAnimClass {
