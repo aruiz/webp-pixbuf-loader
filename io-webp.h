@@ -21,7 +21,7 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #undef  GDK_PIXBUF_ENABLE_BACKEND
 
-enum {
+typedef enum {
     AIDstate_need_initialize = 0,
     AIDstate_need_data = 1,
     AIDstate_have_all_data = 2,
