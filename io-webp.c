@@ -215,18 +215,28 @@ gdk_pixbuf__webp_anim_load_increment(gpointer context,
         WebPContext *data = (WebPContext *) context;
 
         if (data->anim_incr.state == AIDstate_need_initialize) {
-                if (size < 8) {
+                if (size < 12) {
                         g_set_error(error,
                                     GDK_PIXBUF_ERROR,
                                     GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
                                     "Cannot read WebP image header...");
                         return FALSE;
                 }
-                /* check for "RIFF" tag. */
+
+                /* check for "RIFF" tag, and then the "WEBP" tag. */
                 char tag[5];
                 tag[4] = 0;
                 for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (buf + i); }
                 int rc2 = strcmp(tag, "RIFF");
+                if (rc2 != 0) {
+                        g_set_error(error,
+                                    GDK_PIXBUF_ERROR,
+                                    GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                                    "Cannot read WebP image header...");
+                        return FALSE;
+                }
+                for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (buf + 8 + i); }
+                rc2 = strcmp(tag, "WEBP");
                 if (rc2 != 0) {
                         g_set_error(error,
                                     GDK_PIXBUF_ERROR,

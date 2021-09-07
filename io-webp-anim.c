@@ -194,6 +194,11 @@ static void gdk_pixbuf_webp_anim_finalize(GObject *object) {
                 anim->context->anim_incr.used_len = 0;
         }
 
+        WebPDemuxReleaseIterator(anim->webp_iter->wpiter);
+        if (anim->demuxer) {
+                WebPDemuxDelete(anim->demuxer);
+        }
+
         WebPAnimDecoderDelete(anim->dec);
         g_free(anim->animInfo);
         g_free(anim->decOptions);
@@ -332,6 +337,8 @@ static gboolean gdk_pixbuf_webp_anim_iter_advance(GdkPixbufAnimationIter *iter,
                                 return TRUE;
                         }
 
+                        /* Clean up for the next loop. */
+                        WebPDemuxReleaseIterator(webp_iter->wpiter);
                         cur_frame = 0;  /* so it will loop at the end of the animation. */
                 }
                 if (!webp_iter->wpiter->complete) {   /* This does not handle partial loads. All data must be loaded. */
@@ -406,6 +413,29 @@ get_data_from_file(FILE *f, WebPContext *context, GError **error, WebPData *pdat
                             "Failed to read file");
                 return;
         }
+
+        /* Check for RIFF and WEBP tags in WebP container header. */
+        char tag[5];
+        tag[4] = 0;
+        for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (data + i); }
+        int rc2 = strcmp(tag, "RIFF");
+        if (rc2 != 0) {
+                g_set_error(error,
+                            GDK_PIXBUF_ERROR,
+                            GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                            "Cannot read WebP image header...");
+                return;
+        }
+        for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (data + 8 + i); }
+        rc2 = strcmp(tag, "WEBP");
+        if (rc2 != 0) {
+                g_set_error(error,
+                            GDK_PIXBUF_ERROR,
+                            GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                            "Cannot read WebP image header...");
+                return;
+        }
+
         pdata->bytes = data;
         pdata->size = data_size;
         if (context->anim_incr.filedata) {
