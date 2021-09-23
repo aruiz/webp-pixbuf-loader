@@ -13,10 +13,6 @@
 G_DEFINE_TYPE (GdkPixbufWebpAnim, gdk_pixbuf_webp_anim, GDK_TYPE_PIXBUF_ANIMATION);
 G_DEFINE_TYPE (GdkPixbufWebpAnimIter, gdk_pixbuf_webp_anim_iter, GDK_TYPE_PIXBUF_ANIMATION_ITER);
 
-static void
-destroy_data(guchar *pixels, gpointer data) {
-        g_free(pixels);
-}
 
 /* gdk_pixbuf_webp_anim_class code =============================== */
 G_GNUC_BEGIN_IGNORE_DEPRECATIONS
@@ -65,7 +61,7 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 
 static void
 iter_clear(GdkPixbufWebpAnimIter *iter) {
-        iter->cur_frame = 0;
+        iter->cur_frame_num = 0;
 }
 
 G_GNUC_END_IGNORE_DEPRECATIONS
@@ -76,9 +72,9 @@ iter_restart(GdkPixbufWebpAnimIter *iter) {
 }
 
 /*
- * This assumes that WebPDemuxGetFrame(demuxer, 1, webp_iter->wpiter) or
- *   WebPDemuxNextFrame(webp_iter->wpiter)
- * has just been called and there is data in wpiter to create a pixbuf.
+ * This assumes that
+ *   WebPAnimDecoderGetNext(decoder, &webp_iter->webp_anim->curr_frame_ptr, &atime)
+ * has just been called and there is data in curr_frame_ptr to create a pixbuf.
  */
 static
 GdkPixbuf *
@@ -86,19 +82,18 @@ data_to_pixbuf(GdkPixbufWebpAnimIter *iter, gboolean *has_error) {
         GdkPixbufWebpAnimIter *webp_iter;
         gint w, h;
         GdkPixbuf *pixbuf;
-        guint32 data_size;
-        gpointer data;
         guint8 *out;
+        gboolean use_alpha;
 
         webp_iter = GDK_PIXBUF_WEBP_ANIM_ITER (iter);
-        data = (gpointer) webp_iter->wpiter->fragment.bytes;    /* casting away const. */
-        data_size = webp_iter->wpiter->fragment.size;
-        gboolean use_alpha = webp_iter->webp_anim->context->features.has_alpha;
-        if (use_alpha) {
-                out = WebPDecodeRGBA(data, data_size, &w, &h);
-        } else {
-                out = WebPDecodeRGB(data, data_size, &w, &h);
-        }
+        w = (gint) webp_iter->webp_anim->animInfo->canvas_width;
+        h = (gint) webp_iter->webp_anim->animInfo->canvas_height;
+
+        /* WebPAnimDecoderGetNext returns an RGBA type buffer, even if the incoming
+         * WebP container is RGB.
+         */
+        use_alpha = TRUE;      /* = webp_iter->webp_anim->context->features.has_alpha; */
+        out = webp_iter->webp_anim->curr_frame_ptr;
 
         if (!out) {
                 *has_error = TRUE;
@@ -110,8 +105,8 @@ data_to_pixbuf(GdkPixbufWebpAnimIter *iter, gboolean *has_error) {
                                           use_alpha,
                                           8,
                                           w, h,
-                                          w * (use_alpha ? 4 : 3),
-                                          destroy_data,
+                                          w * 4,        /* w * (use_alpha ? 4 : 3) */
+                                          NULL, /* Do not use destroy_data, as dec handles cleanup. */
                                           NULL);
 
         if (!pixbuf) {
@@ -119,7 +114,6 @@ data_to_pixbuf(GdkPixbufWebpAnimIter *iter, gboolean *has_error) {
                 return NULL;
         }
 
-        (void) g_object_ref(pixbuf);  /* if absent, eog fails to load animation. */
         GdkPixbuf *pixb = webp_iter->webp_anim->context->pixbuf;
         if (pixb) {
                 g_object_unref(pixb);
@@ -137,6 +131,10 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 static GdkPixbufAnimationIter *
 gdk_pixbuf_webp_anim_get_iter(GdkPixbufAnimation *anim,
                               const GTimeVal *start_time) {
+        GTimeVal        atime;
+        int             amillitime;
+        gboolean        has_err = FALSE;
+
         if (!anim) {
                 return NULL;
         }
@@ -145,22 +143,34 @@ gdk_pixbuf_webp_anim_get_iter(GdkPixbufAnimation *anim,
                 return GDK_PIXBUF_ANIMATION_ITER (old_anim->webp_iter);
         }
 
+        if (start_time) {
+                atime = *start_time;
+        } else {
+                g_get_current_time(&atime);
+        }
+
         GdkPixbufWebpAnimIter *webp_iter = NULL;
         webp_iter = g_object_new(GDK_TYPE_PIXBUF_WEBP_ANIM_ITER, NULL);
-        (void) g_object_ref(webp_iter);
         webp_iter->webp_anim = GDK_PIXBUF_WEBP_ANIM (anim);
         webp_iter->webp_anim->webp_iter = webp_iter;
         g_object_ref (webp_iter->webp_anim);
 
         webp_iter->wpiter = g_try_new0(WebPIterator, 1);
         /* Attempt to initialize the WebPIterator. */
-        (void) WebPDemuxGetFrame(webp_iter->webp_anim->demuxer, 1, webp_iter->wpiter);
-        gboolean has_err = FALSE;
+        if ( !WebPDemuxGetFrame(webp_iter->webp_anim->demuxer, 0, webp_iter->wpiter)) {
+                return NULL;
+        }
+        WebPAnimDecoder *decoder = webp_iter->webp_anim->dec;
+        if (!WebPAnimDecoderGetNext(decoder, &webp_iter->webp_anim->curr_frame_ptr, &amillitime)) {
+                return NULL;
+        }
+
         (void) data_to_pixbuf(webp_iter, &has_err);
         if (has_err) {
                 return NULL;
         }
         iter_restart(webp_iter);
+
         return GDK_PIXBUF_ANIMATION_ITER (webp_iter);
 }
 
@@ -188,22 +198,22 @@ static void gdk_pixbuf_webp_anim_finalize(GObject *object) {
                 anim->context->anim_incr.filedata = NULL;
         }
 
-        if (anim->context->anim_incr.data) {
-                g_free(anim->context->anim_incr.data);
-                anim->context->anim_incr.data = NULL;
+        if (anim->context->anim_incr.accum_data) {
+                g_free(anim->context->anim_incr.accum_data);
+                anim->context->anim_incr.accum_data = NULL;
                 anim->context->anim_incr.used_len = 0;
         }
 
-        WebPDemuxReleaseIterator(anim->webp_iter->wpiter);
-        if (anim->demuxer) {
-                WebPDemuxDelete(anim->demuxer);
+        if (anim->webp_iter) {
+                g_object_unref(anim->webp_iter);
+                anim->webp_iter = NULL;
         }
-
         WebPAnimDecoderDelete(anim->dec);
         g_free(anim->animInfo);
         g_free(anim->decOptions);
         if (anim->context->pixbuf) {
                 g_object_unref(anim->context->pixbuf);
+                anim->context->pixbuf = NULL;
         }
         g_free(anim->context);   /* not handled in io-webp.c */
         anim->context = NULL;
@@ -271,8 +281,11 @@ gdk_pixbuf_webp_anim_iter_finalize(GObject *object) {
         g_free(iter->wpiter);
         iter->wpiter = NULL;
 
+        /* webp_anim and iter have reciprocal references, hence this little dance. */
+        iter->webp_anim->webp_iter = NULL;
         g_object_unref(iter->webp_anim);
         iter->webp_anim = NULL;
+
         G_OBJECT_CLASS (gdk_pixbuf_webp_anim_iter_parent_class)->finalize(object);
 }
 
@@ -284,7 +297,7 @@ static int gdk_pixbuf_webp_anim_iter_get_delay_time(GdkPixbufAnimationIter *iter
         if (webp_iter && webp_iter->wpiter) {
                 dur = webp_iter->wpiter->duration;
 
-                /* It the loops are completed,
+                /* If the loops are completed,
                  * give the delay time of -1, to indicate
                  * the current image stays forever.
                  */
@@ -312,6 +325,8 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 
 static gboolean gdk_pixbuf_webp_anim_iter_advance(GdkPixbufAnimationIter *iter,
                                                   const GTimeVal *current_time) {
+        int timestamp;
+        GTimeVal atime;
         gboolean hasFrameChanged = FALSE;
         GdkPixbufWebpAnimIter *webp_iter;
         webp_iter = GDK_PIXBUF_WEBP_ANIM_ITER (iter);
@@ -319,26 +334,33 @@ static gboolean gdk_pixbuf_webp_anim_iter_advance(GdkPixbufAnimationIter *iter,
                 return FALSE;
         }
 
+        if (current_time) {
+                atime = *current_time;
+        } else {
+                g_get_current_time(&atime);
+        }
+
         /* Now move to the proper frame */
-        const WebPDemuxer *demuxer = webp_iter->webp_anim->demuxer;
-        /* uint32_t num_frames = WebPDemuxGetI(demuxer, WEBP_FF_FRAME_COUNT); */
+        WebPAnimDecoder *decoder = webp_iter->webp_anim->dec;
         uint32_t num_frames = webp_iter->webp_anim->animInfo->frame_count;
-        int cur_frame = webp_iter->cur_frame;
+        int cur_frame = webp_iter->cur_frame_num;
         if (webp_iter->wpiter->complete) {
                 /* then change frames. */
-                if (webp_iter->cur_frame >= num_frames) {
+                gboolean at_end = FALSE;
+                if (webp_iter->cur_frame_num >= num_frames) {
                         webp_iter->webp_anim->loops_completed += 1;
-                        if ((webp_iter->webp_anim->animInfo->loop_count > 0) &&
+                        at_end = ((webp_iter->webp_anim->animInfo->loop_count > 0) &&
                             (webp_iter->webp_anim->loops_completed >=
-                             webp_iter->webp_anim->animInfo->loop_count)) {
-                                /* This allows breaking the, otherwise endless, loop in eog at
+                             webp_iter->webp_anim->animInfo->loop_count));
+                        if (at_end){
+                                /* This allows breaking, the otherwise endless, loop in eog at
                                  *  eog-image.c:line 2434 in private_timeout().
                                  */
                                 return TRUE;
                         }
 
                         /* Clean up for the next loop. */
-                        WebPDemuxReleaseIterator(webp_iter->wpiter);
+                        WebPAnimDecoderReset((WebPAnimDecoder *) decoder);  /* typecast discards const */
                         cur_frame = 0;  /* so it will loop at the end of the animation. */
                 }
                 if (!webp_iter->wpiter->complete) {   /* This does not handle partial loads. All data must be loaded. */
@@ -346,15 +368,7 @@ static gboolean gdk_pixbuf_webp_anim_iter_advance(GdkPixbufAnimationIter *iter,
                 }
                 cur_frame += 1;
 
-                if (cur_frame == 1) {
-                        if (WebPDemuxGetFrame(demuxer, 1, webp_iter->wpiter) == FALSE) {
-                                return FALSE;
-                        }
-                } else {
-                        if (WebPDemuxNextFrame(webp_iter->wpiter) == FALSE) {
-                                return FALSE;
-                        }
-                }
+                WebPAnimDecoderGetNext(decoder, &webp_iter->webp_anim->curr_frame_ptr, &timestamp);
 
                 gboolean has_err = FALSE;
                 (void) data_to_pixbuf(webp_iter, &has_err);
@@ -363,7 +377,7 @@ static gboolean gdk_pixbuf_webp_anim_iter_advance(GdkPixbufAnimationIter *iter,
                 }
 
                 /* set the status variables. */
-                webp_iter->cur_frame = cur_frame;
+                webp_iter->cur_frame_num = cur_frame;
                 hasFrameChanged = TRUE;
         }
         return hasFrameChanged;
@@ -417,7 +431,7 @@ get_data_from_file(FILE *f, WebPContext *context, GError **error, WebPData *pdat
         /* Check for RIFF and WEBP tags in WebP container header. */
         char tag[5];
         tag[4] = 0;
-        for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (data + i); }
+        for (int i = 0; i < 4; i++) { tag[i] = *(gchar *) (data + i); }
         int rc2 = strcmp(tag, "RIFF");
         if (rc2 != 0) {
                 g_set_error(error,
@@ -426,7 +440,7 @@ get_data_from_file(FILE *f, WebPContext *context, GError **error, WebPData *pdat
                             "Cannot read WebP image header...");
                 return;
         }
-        for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (data + 8 + i); }
+        for (int i = 0; i < 4; i++) { tag[i] = *(gchar *) (data + 8 + i); }
         rc2 = strcmp(tag, "WEBP");
         if (rc2 != 0) {
                 g_set_error(error,
@@ -493,6 +507,12 @@ GdkPixbufAnimation *gdk_pixbuf__webp_image_load_animation_data(const guchar *buf
         animation->decOptions = dec_options;
         animation->pdata.bytes = buf;
         animation->pdata.size = size;
+        if (!WebPInitDecoderConfig(&context->config)) {
+                goto error_end;
+        }
+        context->config.options.dithering_strength = 50;
+        context->config.options.alpha_dithering_strength = 100;
+
         /* pdata has the same lifetime as dec, below. */
 
         dec = WebPAnimDecoderNew(&animation->pdata, dec_options);

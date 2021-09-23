@@ -44,10 +44,11 @@ struct _GdkPixbufWebpAnim {
         WebPContext             *context;
         WebPAnimInfo            *animInfo;
         WebPAnimDecoderOptions  *decOptions;
-        WebPAnimDecoder         *dec; /* dec and demuxer have identical lifetimes. Also pdata.bytes? */
+        WebPAnimDecoder         *dec; /* dec and demuxer have identical lifetimes. dec owns demuxer. */
         WebPDemuxer             *demuxer;
         GdkPixbufWebpAnimIter   *webp_iter;
         WebPData                pdata;
+        uint8_t                 *curr_frame_ptr; /* owned by dec. */
         uint32_t                loops_completed;
 };
 
@@ -73,9 +74,9 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 struct _GdkPixbufWebpAnimIter {
         GdkPixbufAnimationIter parent_instance;
 
-        GdkPixbufWebpAnim *webp_anim;
-        WebPIterator *wpiter;
-        int cur_frame;
+        GdkPixbufWebpAnim       *webp_anim;
+        WebPIterator            *wpiter;
+        int                     cur_frame_num;
 };
 G_GNUC_END_IGNORE_DEPRECATIONS
 struct _GdkPixbufWebpAnimIterClass {

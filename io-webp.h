@@ -21,22 +21,15 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #undef  GDK_PIXBUF_ENABLE_BACKEND
 
-typedef enum {
-    AIDstate_need_initialize = 0,
-    AIDstate_need_data = 1,
-    AIDstate_have_all_data = 2,
-    AIDstate_sending_frames = 3
-} AIDstate;
-
-struct _anim_incr_decode {
-    int     state;          /* AIDstate */
+/* Animation progressive loader state */
+typedef struct {
+    int     state;          /* ACCUMstate */
     guchar  *filedata;
-    guchar  *data;
+    guchar  *accum_data;
     size_t  used_len;
     size_t  cur_max_len;
     size_t  total_data_len;
-};
-typedef struct _anim_incr_decode anim_incr_decode;
+} AnimIncrDecode;
 
 /* Progressive loader context */
 typedef struct {
@@ -49,7 +42,7 @@ typedef struct {
     gboolean got_header;
     WebPIDecoder *idec;
     WebPBitstreamFeatures features;     /* used by animation. */
-    anim_incr_decode anim_incr;         /* used by animation. */
+    AnimIncrDecode anim_incr;         /* used by animation. */
     gint last_y;
     GError **error;
 } WebPContext;

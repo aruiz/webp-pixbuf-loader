@@ -14,6 +14,13 @@
 
 #define  IMAGE_READ_BUFFER_SIZE 65535
 
+typedef enum {
+        ACCUMstate_need_initialize = 0,
+        ACCUMstate_need_data,
+        ACCUMstate_have_all_data,
+        ACCUMstate_sending_frames
+} ACCUMstate;
+
 /* from io-webp-anim.c */
 extern
 GdkPixbufAnimation *gdk_pixbuf__webp_image_load_animation(FILE *file,
@@ -115,9 +122,7 @@ static gboolean
 gdk_pixbuf__webp_image_stop_load(gpointer context, GError **error) {
         WebPContext *data = (WebPContext *) context;
         g_return_val_if_fail(data != NULL, TRUE);
-        if (data->pixbuf) {
-                g_object_unref(data->pixbuf);
-        }
+
         if (data->idec) {
                 WebPIDelete(data->idec);
         }
@@ -131,8 +136,8 @@ gdk_pixbuf__webp_image_stop_load(gpointer context, GError **error) {
  * returns the new ptr
  */
 static
-gpointer realloc_copy_mem(anim_incr_decode *anim_context, const guchar *newbuf, guint size) {
-        guchar *core_data = anim_context->data;
+gpointer realloc_copy_mem(AnimIncrDecode *anim_context, const guchar *newbuf, guint size) {
+        guchar *core_data = anim_context->accum_data;
         size_t core_used_len = anim_context->used_len;
         size_t core_cur_max_len = anim_context->cur_max_len;
         size_t size_to_add = IMAGE_READ_BUFFER_SIZE;
@@ -170,22 +175,26 @@ gpointer realloc_copy_mem(anim_incr_decode *anim_context, const guchar *newbuf, 
                 }
         }
 
-        anim_context->data = core_data;
+        anim_context->accum_data = core_data;
         anim_context->cur_max_len = core_cur_max_len;
         anim_context->used_len = core_used_len;
 
         return core_data;
 }
 
+/*
+ * Only called after all data is present.
+ * At that point the size is data->anim_incr.total_data_len .
+ */
 void
 static create_anim(WebPContext *data,
                    guchar *ptr, guint size,
                    GError **error) {
-        data->anim_incr.data = ptr;
+        data->anim_incr.accum_data = ptr;
         if (data->anim_incr.used_len == data->anim_incr.total_data_len) {
-                data->anim_incr.state = AIDstate_have_all_data;
+                data->anim_incr.state = ACCUMstate_have_all_data;
                 GdkPixbufAnimation *anim = gdk_pixbuf__webp_image_load_animation_data(
-                        data->anim_incr.data,
+                        data->anim_incr.accum_data,
                         data->anim_incr.used_len,
                         data,
                         error);
@@ -193,7 +202,7 @@ static create_anim(WebPContext *data,
                 GdkPixbufAnimationIter *anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
                 GdkPixbuf *pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
                 data->pixbuf = pixbuf;
-                data->anim_incr.state = AIDstate_sending_frames;
+                data->anim_incr.state = ACCUMstate_sending_frames;
                 if (data->prepare_func) {
                         (*data->prepare_func)(data->pixbuf,
                                               anim,
@@ -214,7 +223,7 @@ gdk_pixbuf__webp_anim_load_increment(gpointer context,
                                      GError **error) {
         WebPContext *data = (WebPContext *) context;
 
-        if (data->anim_incr.state == AIDstate_need_initialize) {
+        if (data->anim_incr.state == ACCUMstate_need_initialize) {
                 if (size < 12) {
                         g_set_error(error,
                                     GDK_PIXBUF_ERROR,
@@ -226,7 +235,7 @@ gdk_pixbuf__webp_anim_load_increment(gpointer context,
                 /* check for "RIFF" tag, and then the "WEBP" tag. */
                 char tag[5];
                 tag[4] = 0;
-                for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (buf + i); }
+                for (int i = 0; i < 4; i++) { tag[i] = *(gchar *) (buf + i); }
                 int rc2 = strcmp(tag, "RIFF");
                 if (rc2 != 0) {
                         g_set_error(error,
@@ -235,7 +244,7 @@ gdk_pixbuf__webp_anim_load_increment(gpointer context,
                                     "Cannot read WebP image header...");
                         return FALSE;
                 }
-                for (int i = 0; i < 4; i++) { tag[i] = *(u_int8_t *) (buf + 8 + i); }
+                for (int i = 0; i < 4; i++) { tag[i] = *(gchar *) (buf + 8 + i); }
                 rc2 = strcmp(tag, "WEBP");
                 if (rc2 != 0) {
                         g_set_error(error,
@@ -292,31 +301,33 @@ gdk_pixbuf__webp_anim_load_increment(gpointer context,
                         }
                 }
 
-                (void *) memcpy(ptr, buf, size);
-                data->anim_incr.data = ptr;
+                memcpy(ptr, buf, size);
+                data->anim_incr.accum_data = ptr;
                 data->anim_incr.used_len = size;
                 data->anim_incr.cur_max_len = anim_size + 8;
                 data->anim_incr.total_data_len = anim_size + 8;
-                data->anim_incr.state = AIDstate_need_data;
+                data->anim_incr.state = ACCUMstate_need_data;
+                data->config.options.dithering_strength = 50;
+                data->config.options.alpha_dithering_strength = 100;
                 if (size == data->anim_incr.total_data_len) {
-                        data->anim_incr.state = AIDstate_have_all_data;
+                        data->anim_incr.state = ACCUMstate_have_all_data;
                         create_anim(data, ptr, size, error);
                 } else if (size > data->anim_incr.total_data_len) {
                         return FALSE;
                 }
                 return TRUE;
-        } else if (data->anim_incr.state == AIDstate_need_data) {
+        } else if (data->anim_incr.state == ACCUMstate_need_data) {
                 gpointer ptr = realloc_copy_mem(&data->anim_incr, buf, size);
                 if (data->anim_incr.used_len == data->anim_incr.total_data_len) {
-                        data->anim_incr.state = AIDstate_have_all_data;
+                        data->anim_incr.state = ACCUMstate_have_all_data;
                         create_anim(data, ptr, data->anim_incr.used_len, error);
                 } else if (data->anim_incr.used_len > data->anim_incr.total_data_len) {
                         return FALSE;
                 }
                 return TRUE;
-        } else if (data->anim_incr.state == AIDstate_have_all_data) {
+        } else if (data->anim_incr.state == ACCUMstate_have_all_data) {
                 return TRUE;
-        } else if (data->anim_incr.state == AIDstate_sending_frames) {
+        } else if (data->anim_incr.state == ACCUMstate_sending_frames) {
                 return TRUE;
         }
         return FALSE;
