@@ -297,6 +297,17 @@ static int gdk_pixbuf_webp_anim_iter_get_delay_time(GdkPixbufAnimationIter *iter
         if (webp_iter && webp_iter->wpiter) {
                 dur = webp_iter->wpiter->duration;
 
+                /* do what gif's do for short duration frames.
+                 * See gdk-pixbuf/gdk-pixbuf/io-gif.c in the function gif_get_lzw.
+                 * And also see https://developers.google.com/speed/webp/docs/riff_container under "Frame Duration".
+                 */
+                if (dur == 0) {
+                        dur = 100;      /* slow */
+                }
+                if (dur < 20) {
+                        dur = 20;       /* fast */
+                }
+
                 /* If the loops are completed,
                  * give the delay time of -1, to indicate
                  * the current image stays forever.
