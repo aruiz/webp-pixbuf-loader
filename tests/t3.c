@@ -40,7 +40,7 @@ main(gint argc, gchar **argv) {
                         }
                 }
                 g_print("Total frames parsed: %d\n", cntFrames);
-                g_assert(cntFrames == 11);
+                g_assert(cntFrames == 10);
                 /* note there should be 2 loops in the test t3.webp file. */
                 g_object_unref(anim_iter);
         }

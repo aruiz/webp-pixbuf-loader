@@ -5,6 +5,7 @@ t1 = executable('t1', 't1.c',
 t2 = executable('t2', 't2.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux])
 t3 = executable('t3', 't3.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux])
 t4 = executable('t4', 't4.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux])
+t5 = executable('t5', 't5.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux])
 
 loaders_data = configuration_data()
 loaders_data.set('MODULE_PATH', pbl_webp.full_path())
@@ -24,3 +25,6 @@ test('load animation and parse', t3, env : ['GDK_PIXBUF_MODULE_FILE=' +
 test('load animation and display', t4, env : ['GDK_PIXBUF_MODULE_FILE=' +
                                   meson.current_build_dir() + '/loaders.cache',
                           'TEST_FILE=' + meson.current_source_dir() + '/t3.webp'])
+test('load animation test duration', t5, env : ['GDK_PIXBUF_MODULE_FILE=' +
+                                  meson.current_build_dir() + '/loaders.cache',
+                          'TEST_FILE=' + meson.current_source_dir() + '/t5.webp'])

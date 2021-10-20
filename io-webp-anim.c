@@ -57,18 +57,9 @@ static GdkPixbuf *gdk_pixbuf_webp_anim_get_static_image(GdkPixbufAnimation *anim
         return gdk_pixbuf_webp_anim_iter_get_pixbuf(iter);
 }
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-
-static void
-iter_clear(GdkPixbufWebpAnimIter *iter) {
-        iter->cur_frame_num = 0;
-}
-
-G_GNUC_END_IGNORE_DEPRECATIONS
-
 static void
 iter_restart(GdkPixbufWebpAnimIter *iter) {
-        iter_clear(iter);
+        iter->cur_frame_num = 1;
 }
 
 /*
@@ -157,7 +148,7 @@ gdk_pixbuf_webp_anim_get_iter(GdkPixbufAnimation *anim,
 
         webp_iter->wpiter = g_try_new0(WebPIterator, 1);
         /* Attempt to initialize the WebPIterator. */
-        if ( !WebPDemuxGetFrame(webp_iter->webp_anim->demuxer, 0, webp_iter->wpiter)) {
+        if ( !WebPDemuxGetFrame(webp_iter->webp_anim->demuxer, 1, webp_iter->wpiter)) {
                 return NULL;
         }
         WebPAnimDecoder *decoder = webp_iter->webp_anim->dec;
@@ -182,10 +173,10 @@ static void gdk_pixbuf_webp_anim_get_size(GdkPixbufAnimation *animation,
         GdkPixbufWebpAnim *anim = GDK_PIXBUF_WEBP_ANIM (animation);
         if (anim && anim->context) {
                 if (width) {
-                        *width = anim->context->features.width;
+                        *width = anim->context->features.width;         /* canvas width */
                 }
                 if (height) {
-                        *height = anim->context->features.height;
+                        *height = anim->context->features.height;       /* canvas height */
                 }
         }
 }
@@ -380,6 +371,13 @@ static gboolean gdk_pixbuf_webp_anim_iter_advance(GdkPixbufAnimationIter *iter,
                 cur_frame += 1;
 
                 WebPAnimDecoderGetNext(decoder, &webp_iter->webp_anim->curr_frame_ptr, &timestamp);
+
+                /*
+                 * Frame duration can vary with each frame. WebPAnimDecoderGetNext does not
+                 *   give access to the new duration. WebPDemuxGetFrame is used to update
+                 *   the WebPIterator which contains duration.
+                 */
+                WebPDemuxGetFrame(webp_iter->webp_anim->demuxer, cur_frame, webp_iter->wpiter);
 
                 gboolean has_err = FALSE;
                 (void) data_to_pixbuf(webp_iter, &has_err);
