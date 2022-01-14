@@ -19,6 +19,8 @@ gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'),
 pbl_webp = shared_library('pixbufloader-webp',
                           sources: ['io-webp.c', 'io-webp-anim.c'],
                           dependencies: [gdkpb, webp, webpdemux],
+                          # Workaround for https://gitlab.gnome.org/GNOME/glib/issues/1413
+                          name_suffix: host_machine.system() == 'darwin' ? 'so' : [],
                           install: true,
                           install_dir: gdk_pb_moddir)
 
