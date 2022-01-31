@@ -38,23 +38,6 @@ typedef struct _GdkPixbufWebpAnimClass GdkPixbufWebpAnimClass;
 
 typedef struct _GdkPixbufWebpAnimIter GdkPixbufWebpAnimIter;
 
-/* Private part of the GdkPixbufWebpAnim structure. */
-struct _GdkPixbufWebpAnim {
-        GdkPixbufAnimation      parent_instance;
-        WebPContext             *context;
-        WebPAnimInfo            *animInfo;
-        WebPAnimDecoderOptions  *decOptions;
-        WebPAnimDecoder         *dec; /* dec and demuxer have identical lifetimes. dec owns demuxer. */
-        WebPDemuxer             *demuxer;
-        GdkPixbufWebpAnimIter   *webp_iter;
-        WebPData                pdata;
-        uint8_t                 *curr_frame_ptr; /* owned by dec. */
-        uint32_t                loops_completed;
-};
-
-struct _GdkPixbufWebpAnimClass {
-        GdkPixbufAnimationClass parent_class;
-};
 
 GType gdk_pixbuf_webp_anim_get_type(void) G_GNUC_CONST;
 
@@ -69,19 +52,6 @@ typedef struct _GdkPixbufWebpAnimIterClass GdkPixbufWebpAnimIterClass;
 #define GDK_IS_PIXBUF_GIF_ANIM_ITER_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE ((klass), GDK_TYPE_PIXBUF_GIF_ANIM_ITER))
 #define GDK_PIXBUF_GIF_ANIM_ITER_GET_CLASS(obj)    (G_TYPE_INSTANCE_GET_CLASS ((obj), GDK_TYPE_PIXBUF_GIF_ANIM_ITER, GdkPixbufGifAnimIterClass))
 
-/* Private part of the GdkPixbufWebpAnimIter structure. */
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-struct _GdkPixbufWebpAnimIter {
-        GdkPixbufAnimationIter parent_instance;
-
-        GdkPixbufWebpAnim       *webp_anim;
-        WebPIterator            *wpiter;
-        int                     cur_frame_num;
-};
-G_GNUC_END_IGNORE_DEPRECATIONS
-struct _GdkPixbufWebpAnimIterClass {
-        GdkPixbufAnimationIterClass parent_class;
-};
 
 GType gdk_pixbuf_webp_anim_iter_get_type(void) G_GNUC_CONST;
 

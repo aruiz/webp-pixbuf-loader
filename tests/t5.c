@@ -33,9 +33,9 @@ main(gint argc, gchar **argv) {
         buffer = g_new0 (guchar, IMAGE_READ_BUFFER_SIZE);
         loader = gdk_pixbuf_loader_new_with_mime_type(mime_type, error);
 
-        if (! GDK_IS_PIXBUF_LOADER(loader)) {
+        if (! GDK_IS_PIXBUF_LOADER(loader))
                 g_assert(FALSE);
-        }
+
         bytes_read = g_input_stream_read (G_INPUT_STREAM (input_stream),
                                           buffer,
                                           IMAGE_READ_BUFFER_SIZE,
@@ -104,20 +104,19 @@ main(gint argc, gchar **argv) {
                 }
 
                 delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
-                if ((delay < 0) || (cntFrames > 100)) {
+                if ((delay < 0) || (cntFrames > 100))
                         break;
-                }
+
 
                 /* check duration for various frames. */
-                if (cntFrames == 5 || cntFrames == 10) {
+                if (cntFrames == 5 || cntFrames == 10)
                         g_assert(delay == 1000);
-                }
-                if (cntFrames == 1 || cntFrames == 6 || cntFrames == 11) {
+
+                if (cntFrames == 1 || cntFrames == 6 || cntFrames == 11)
                         g_assert(delay == 300);
-                }
-                if (cntFrames == 4 || cntFrames == 9 || cntFrames == 14) {
+
+                if (cntFrames == 4 || cntFrames == 9 || cntFrames == 14)
                         g_assert(delay == 1000);
-                }
         }
         g_print("Total frames parsed: %d\n", cntFrames);
         g_assert(cntFrames == 15);

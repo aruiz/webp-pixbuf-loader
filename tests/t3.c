@@ -20,7 +20,8 @@ main(gint argc, gchar **argv) {
                 while (hasAdv) {
                         gboolean has_new_frame = FALSE;
                         g_get_current_time(&curTime);
-                        has_new_frame = gdk_pixbuf_animation_iter_advance(anim_iter, &curTime);
+                        has_new_frame = gdk_pixbuf_animation_iter_advance(anim_iter,
+                                                                          &curTime);
                         if (has_new_frame) {
                                 cntFrames += 1;
                                 pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
