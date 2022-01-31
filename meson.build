@@ -1,5 +1,5 @@
 
-project('webp-pixbuf-loader', 'c')
+project('webp-pixbuf-loader', 'c', meson_version: '>=0.50')
 gdkpb = dependency('gdk-pixbuf-2.0', version: '>2.22.0', method: 'pkg-config')
 gdk_pb_moddir = get_option('gdk_pixbuf_moduledir')
 if gdk_pb_moddir == ''

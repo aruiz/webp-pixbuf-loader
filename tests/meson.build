@@ -33,7 +33,7 @@ t4_gtk3_exe = executable('t4_gtk3_exe',
                           link_with : pbl_webp,
                           dependencies: [gdkpb, webp, webpdemux, gtk3],
                           install: false)
-test('t4_gtk3_exe', t4_gtk3_exe)
+#test('t4_gtk3_exe', t4_gtk3_exe)
 endif
 
 test('load animation test duration', t5, env : ['GDK_PIXBUF_MODULE_FILE=' +
