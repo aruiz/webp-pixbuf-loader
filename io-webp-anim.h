@@ -25,34 +25,20 @@
 
 #include "io-webp.h"
 
-typedef struct _GdkPixbufWebpAnim GdkPixbufWebpAnim;
-typedef struct _GdkPixbufWebpAnimClass GdkPixbufWebpAnimClass;
+G_BEGIN_DECLS
 
+/* GdkPixbufWebpAnim  */
 #define GDK_TYPE_PIXBUF_WEBP_ANIM              (gdk_pixbuf_webp_anim_get_type ())
+G_DECLARE_FINAL_TYPE(GdkPixbufWebpAnim, GDK_TYPE_PIXBUF_WEBP_ANIM, GdkPixbufWebp, ANIM, GdkPixbufAnimation)
 #define GDK_PIXBUF_WEBP_ANIM(object)           (G_TYPE_CHECK_INSTANCE_CAST ((object), GDK_TYPE_PIXBUF_WEBP_ANIM, GdkPixbufWebpAnim))
 #define GDK_IS_PIXBUF_WEBP_ANIM(object)        (G_TYPE_CHECK_INSTANCE_TYPE ((object), GDK_TYPE_PIXBUF_WEBP_ANIM))
 
-#define GDK_PIXBUF_WEBP_ANIM_CLASS(klass)      (G_TYPE_CHECK_CLASS_CAST ((klass), GDK_TYPE_PIXBUF_WEBP_ANIM, GdkPixbufWebpAnimClass))
-#define GDK_IS_PIXBUF_WEBP_ANIM_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE ((klass), GDK_TYPE_PIXBUF_WEBP_ANIM))
-#define GDK_PIXBUF_WEBP_ANIM_GET_CLASS(obj)    (G_TYPE_INSTANCE_GET_CLASS ((obj), GDK_TYPE_PIXBUF_WEBP_ANIM, GdkPixbufWebpAnimClass))
-
-typedef struct _GdkPixbufWebpAnimIter GdkPixbufWebpAnimIter;
-
-
-GType gdk_pixbuf_webp_anim_get_type(void) G_GNUC_CONST;
-
-/* GdkPixbufWebpAnimIter -->   */
-typedef struct _GdkPixbufWebpAnimIterClass GdkPixbufWebpAnimIterClass;
-
+/* GdkPixbufWebpAnimIter  */
 #define GDK_TYPE_PIXBUF_WEBP_ANIM_ITER              (gdk_pixbuf_webp_anim_iter_get_type ())
+G_DECLARE_FINAL_TYPE(GdkPixbufWebpAnimIter, GDK_PIXBUF_WEBP_ANIM_ITER, GdkPixbufWebp, ANIM_ITER, GdkPixbufAnimationIter)
 #define GDK_PIXBUF_WEBP_ANIM_ITER(object)           (G_TYPE_CHECK_INSTANCE_CAST ((object), GDK_TYPE_PIXBUF_WEBP_ANIM_ITER, GdkPixbufWebpAnimIter))
 #define GDK_IS_PIXBUF_WEBP_ANIM_ITER(object)        (G_TYPE_CHECK_INSTANCE_TYPE ((object), GDK_TYPE_PIXBUF_WEBP_ANIM_ITER))
 
-#define GDK_PIXBUF_GIF_ANIM_ITER_CLASS(klass)      (G_TYPE_CHECK_CLASS_CAST ((klass), GDK_TYPE_PIXBUF_GIF_ANIM_ITER, GdkPixbufGifAnimIterClass))
-#define GDK_IS_PIXBUF_GIF_ANIM_ITER_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE ((klass), GDK_TYPE_PIXBUF_GIF_ANIM_ITER))
-#define GDK_PIXBUF_GIF_ANIM_ITER_GET_CLASS(obj)    (G_TYPE_INSTANCE_GET_CLASS ((obj), GDK_TYPE_PIXBUF_GIF_ANIM_ITER, GdkPixbufGifAnimIterClass))
-
-
-GType gdk_pixbuf_webp_anim_iter_get_type(void) G_GNUC_CONST;
+G_END_DECLS
 
 #endif /* IO_WEBP_ANIM_H */

@@ -12,6 +12,7 @@
 /* Private part of the GdkPixbufWebpAnim structure. */
 struct _GdkPixbufWebpAnim {
         GdkPixbufAnimation      parent_instance;
+
         WebPContext             *context;
         WebPAnimInfo            *animInfo;
         WebPAnimDecoderOptions  *decOptions;
@@ -21,10 +22,6 @@ struct _GdkPixbufWebpAnim {
         WebPData                pdata;
         uint8_t                 *curr_frame_ptr; /* owned by dec. */
         uint32_t                loops_completed;
-};
-
-struct _GdkPixbufWebpAnimClass {
-        GdkPixbufAnimationClass parent_class;
 };
 
 /* Private part of the GdkPixbufWebpAnimIter structure. */
@@ -38,9 +35,6 @@ struct _GdkPixbufWebpAnimIter {
 };
 G_GNUC_END_IGNORE_DEPRECATIONS
 
-struct _GdkPixbufWebpAnimIterClass {
-        GdkPixbufAnimationIterClass parent_class;
-};
 /* End of private structs */
 
 G_DEFINE_TYPE (GdkPixbufWebpAnim, gdk_pixbuf_webp_anim, GDK_TYPE_PIXBUF_ANIMATION);

@@ -382,11 +382,11 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
                         (* data->size_func) (&scaled_w, &scaled_h,
                                              data->user_data);
                         if (scaled_w != w || scaled_h != h) {
-                                data->config.options.use_scaling = TRUE;
-                                data->config.options.scaled_width = scaled_w;
-                                data->config.options.scaled_height = scaled_h;
-                                w = scaled_w;
-                                h = scaled_h;
+                            data->config.options.use_scaling = TRUE;
+                            data->config.options.scaled_width = scaled_w;
+                            data->config.options.scaled_height = scaled_h;
+                            w = scaled_w;
+                            h = scaled_h;
                         }
                 }
 
@@ -560,11 +560,11 @@ real_save_webp (GdkPixbuf        *pixbuf,
                                         return FALSE;
                                 }
                                 if (WebPConfigPreset (&config, preset, config.quality) == 0) {
-                                        g_set_error (error,
-                                                     GDK_PIXBUF_ERROR,
-                                                     GDK_PIXBUF_ERROR_FAILED,
-                                                     "Could not initialize decoder with preset.");
-                                        return FALSE;
+                                         g_set_error (error,
+                                                      GDK_PIXBUF_ERROR,
+                                                      GDK_PIXBUF_ERROR_FAILED,
+                                                      "Could not initialize decoder with preset.");
+                                         return FALSE;
                                 }
                         }
                         ++kiter;
