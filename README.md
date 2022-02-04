@@ -1,7 +1,7 @@
 WebP GDK Pixbuf Loader library
 ==============================
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/webp-pixbuf-loader.svg)](https://repology.org/project/webp-pixbuf-loader/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/webp-pixbuf-loader.svg?exclude_unsupported=1)](https://repology.org/project/webp-pixbuf-loader/versions)
 
 
 Building from source
