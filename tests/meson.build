@@ -7,6 +7,7 @@ t3 = executable('t3', 't3.c', link_with : pbl_webp, dependencies : [gdkpb, webp,
 t4 = executable('t4', 't4.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux, gio2])
 # t4-gtk3 see below.
 t5 = executable('t5', 't5.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux, gio2])
+t6 = executable('t6', 't6.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux, gio2])
 
 loaders_data = configuration_data()
 loaders_data.set('MODULE_PATH', pbl_webp.full_path())
@@ -39,3 +40,7 @@ endif
 test('load animation test duration', t5, env : ['GDK_PIXBUF_MODULE_FILE=' +
                                   meson.current_build_dir() + '/loaders.cache',
                           'TEST_FILE=' + meson.current_source_dir() + '/t5.webp'])
+
+test('get file info', t6, env : ['GDK_PIXBUF_MODULE_FILE=' +
+                                  meson.current_build_dir() + '/loaders.cache',
+                          'TEST_FILE=' + meson.current_source_dir() + '/t1.webp'])

@@ -309,7 +309,7 @@ gdk_pixbuf__webp_anim_load_increment (gpointer      context,
 
                         (*data->size_func) (&scaled_w, &scaled_h,
                                             data->user_data);
-                        if (scaled_w != w || scaled_h != h) {
+                        if (scaled_w != 0 && scaled_h != 0 && (scaled_w != w || scaled_h != h)) {
                                 data->config.options.use_scaling = TRUE;
                                 data->config.options.scaled_width = scaled_w;
                                 data->config.options.scaled_height = scaled_h;
@@ -381,7 +381,7 @@ gdk_pixbuf__webp_image_load_increment (gpointer context,
 
                         (* data->size_func) (&scaled_w, &scaled_h,
                                              data->user_data);
-                        if (scaled_w != w || scaled_h != h) {
+                        if (scaled_w != 0 && scaled_h != 0 && (scaled_w != w || scaled_h != h)) {
                             data->config.options.use_scaling = TRUE;
                             data->config.options.scaled_width = scaled_w;
                             data->config.options.scaled_height = scaled_h;
