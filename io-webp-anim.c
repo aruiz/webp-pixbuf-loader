@@ -415,19 +415,21 @@ gdk_pixbuf_webp_anim_iter_advance (GdkPixbufAnimationIter *iter,
                 }
                 cur_frame += 1;
 
-                WebPAnimDecoderGetNext (decoder,
+                if (!WebPAnimDecoderGetNext (decoder,
                                         &webp_iter->webp_anim->curr_frame_ptr,
-                                        &timestamp);
-
+                                        &timestamp)) {
+                        return FALSE;
+                }
                 /*
                  * Frame duration can vary with each frame. WebPAnimDecoderGetNext does not
                  *   give access to the new duration. WebPDemuxGetFrame is used to update
                  *   the WebPIterator which contains duration.
                  */
-                WebPDemuxGetFrame (webp_iter->webp_anim->demuxer,
+                if (!WebPDemuxGetFrame (webp_iter->webp_anim->demuxer,
                                    cur_frame,
-                                   webp_iter->wpiter);
-
+                                   webp_iter->wpiter)) {
+                        return FALSE;
+                }
                 gboolean has_err = FALSE;
                 (void) data_to_pixbuf (webp_iter, &has_err);
                 if (has_err)
