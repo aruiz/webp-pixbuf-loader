@@ -12,6 +12,10 @@
 
 #include "io-webp.h"
 
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#include <byteswap.h>
+#endif
+
 #define  IMAGE_READ_BUFFER_SIZE 65535
 
 typedef enum
@@ -273,6 +277,11 @@ gdk_pixbuf__webp_anim_load_increment (gpointer      context,
 
                 /* The next 4 bytes give the size of the webp container less the 8 byte header. */
                 uint32_t anim_size = *(uint32_t *) (buf + 4); /* gives file size not counting the first 8 bytes. */
+
+                #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		anim_size = bswap_32(anim_size);
+                #endif
+
                 uint32_t file_size = anim_size + 8;
                 if (file_size < size) {
                         /* user asking to insert data larger than the image size set in the file data. */
