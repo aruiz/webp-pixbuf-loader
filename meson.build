@@ -1,4 +1,4 @@
-project('webp-pixbuf-loader', 'c', meson_version: '>=0.50')
+project('webp-pixbuf-loader', 'c', meson_version: '>=0.53')
 gdkpb = dependency('gdk-pixbuf-2.0', version: '>2.22.0', method: 'pkg-config')
 gdk_pb_moddir = get_option('gdk_pixbuf_moduledir')
 if gdk_pb_moddir == ''
@@ -13,8 +13,8 @@ gtk3 = dependency('gtk+-3.0', version: '>3.22.0', method: 'pkg-config', required
 # -34/-64 is to overcome a Fedora bug in the .pc file
 # debian has a similar problem with its .pc file but it requires knowing the platform triad
 
-gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64')
-
+machine_triplet = run_command('gcc', '-dumpmachine', check: true).stdout().strip()
+gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: ['/usr/lib' / machine_triplet / 'gdk-pixbuf-2.0'])
 
 pbl_webp = shared_library('pixbufloader-webp',
                           sources: ['io-webp.c', 'io-webp-anim.c'],

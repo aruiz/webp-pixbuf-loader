@@ -1,2 +1,2 @@
-option('gdk_pixbuf_query_loaders_path', type: 'string', description: 'A non default path for the gdk-pixbuf-query-loaders binary')
+option('gdk_pixbuf_query_loaders_path', type: 'string', description: 'A non default path for the gdk-pixbuf-query-loaders binary', value: 'gdk-pixbuf-query-loaders')
 option('gdk_pixbuf_moduledir', type: 'string', description: 'The path to install gdk-pixbuf modules into')
