@@ -1,0 +1,19 @@
+name: WebP Pixbuf CI
+'on':
+  push:
+    branches:
+      - mainline
+  pull_request:
+    branches:
+      - mainline
+jobs:
+  Build:
+    runs-on: ubuntu-18.04
+    steps:
+      - run: sudo apt update
+      - run: sudo apt install ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev
+      - run: mkdir build
+      - run: meson build
+      - run: cd build
+      - run: ninja
+      - run: ninja test
