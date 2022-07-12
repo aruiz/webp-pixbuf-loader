@@ -12,18 +12,15 @@ Building from source
   ninja -C builddir
   ```
 
-  Build on Debian/Ubuntu:
-
-  Install dependencies:
+  Install dependencies on Debian:
   ```
   sudo apt install libwebp-dev libgdk-pixbuf2.0-dev libgtk-3-dev meson build-essential
   ```
   (libgtk-3-dev is optional, used in development)
 
-  Build:
+  Install dependencies on Fedora:
   ```
-  meson builddir -Dgdk_pixbuf_query_loaders_path=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders
-  ninja -C builddir
+  sudo dnf install libwebp-devel gdk-pixbuf2-devel meson gcc
   ```
 
   Install:
