@@ -2,14 +2,10 @@
 
 gint
 main (gint argc, gchar **argv)  {
-  GError *error = NULL;
   gchar **env = g_get_environ();
 
   g_warning("%s", g_environ_getenv(env, "TEST_FILE"));
   GdkPixbufFormat *format = gdk_pixbuf_get_file_info (g_environ_getenv(env, "TEST_FILE"), NULL, NULL);
-  if (!format) {
-    g_error("%s", error->message);
-  };
 
   g_assert(format != NULL);
   gchar *name = gdk_pixbuf_format_get_name (format);
