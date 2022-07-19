@@ -645,11 +645,9 @@ gdk_pixbuf__webp_image_save_to_callback (GdkPixbufSaveFunc   save_func,
                                          gchar             **values,
                                          GError            **error)
 {
-        save_context *context = g_new0 (save_context, 1);
-        context->func = save_func;
-        context->data = user_data;
+        save_context context = { .func = save_func, .data = user_data };
         return real_save_webp (pixbuf, keys, values, error,
-                               TRUE, NULL, context);
+                               TRUE, NULL, &context);
 }
 
 void
