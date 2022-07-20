@@ -1,0 +1,35 @@
+name: WebP Pixbuf CI [MSYS2]
+'on':
+  push:
+    branches:
+      - mainline
+  pull_request:
+    branches:
+      - mainline
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        sys:
+          - ucrt64
+          - clang64
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{matrix.sys}}
+          pacboy: >-
+            cc:p
+            meson:p
+            ninja:p
+            pkgconf:p
+            gdk-pixbuf2:p
+            libwebp:p
+      - run: mkdir -p build
+      - run: meson build
+      - run: meson compile -C build
+      - run: meson test -C build
