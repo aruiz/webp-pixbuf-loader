@@ -67,10 +67,15 @@ main(gint argc, gchar **argv) {
         gboolean isStatic = gdk_pixbuf_animation_is_static_image(anim);
         if (!isStatic) {
                 GtkApplication *app;
+
+                G_GNUC_BEGIN_IGNORE_DEPRECATIONS
                 GTimeVal curTime;
+                g_get_current_time(&curTime);
+                G_GNUC_END_IGNORE_DEPRECATIONS
+
                 AnimationStructure *ani = g_new0(AnimationStructure, 1);
                 ani->anim = anim;
-                g_get_current_time(&curTime);
+
                 anim_iter = gdk_pixbuf_animation_get_iter(anim, &curTime);
                 int delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
                 ani->anim_iter = anim_iter;

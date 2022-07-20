@@ -1,51 +1,66 @@
+/*
+ * This tests duration for various frames in t5.webp .
+ * The first frame and the fifth (last) frame have duration 1000,
+ * and the other frames have duration 300.
+ * The webp container has 3 loops.
+*/
+
 #include <gdk-pixbuf/gdk-pixbuf.h>
 
 gint
-main(gint argc, gchar **argv) {
-        gchar **env = g_get_environ();
-        g_warning("%s", g_environ_getenv(env, "TEST_FILE"));
-        GdkPixbufAnimation *anim = NULL;
-        anim = gdk_pixbuf_animation_new_from_file(g_environ_getenv(env, "TEST_FILE"), NULL);
-        gboolean isStatic = gdk_pixbuf_animation_is_static_image(anim);
-        if (!isStatic) {
-                int cntFrames = 0;
+main(gint argc, gchar **argv)
+{
+        const gchar *file_path = g_getenv("TEST_FILE");
 
-                G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-                GTimeVal curTime;
-                g_get_current_time(&curTime);
-                G_GNUC_END_IGNORE_DEPRECATIONS
+        /* setup animation. */
+        g_autoptr(GdkPixbufAnimation) anim = gdk_pixbuf_animation_new_from_file (file_path, NULL);
+        g_assert(anim != NULL); /* animation has been created. */
 
-                GdkPixbufAnimationIter *anim_iter = gdk_pixbuf_animation_get_iter(anim, &curTime);
-                while (TRUE) {
-                        G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-                        g_get_current_time(&curTime);
-                        G_GNUC_END_IGNORE_DEPRECATIONS
-
-                        if (gdk_pixbuf_animation_iter_advance(anim_iter, &curTime)) {
-                                cntFrames += 1;
-                                GdkPixbuf *pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
-                                int w = gdk_pixbuf_get_width(pixbuf);
-                                int h = gdk_pixbuf_get_height(pixbuf);
-                                if (cntFrames == 1) {
-                                        g_print("Width is %d and Height is %d .\n", w, h);
-                                        g_assert(w == 300);
-                                        g_assert(h == 300);
-                                }
-                        } else {
-                                break;
-                        }
-                        int delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
-                        if ((delay < 0) || (cntFrames > 100)) {
-                                break;
-                        }
-                }
-                g_print("Total frames parsed: %d\n", cntFrames);
-                g_assert(cntFrames == 10);
-                /* note there should be 2 loops in the test t3.webp file. */
-                g_object_unref(anim_iter);
+        if (gdk_pixbuf_animation_is_static_image(anim)) {
+                g_error("TEST_FILE is not an animated WebP sample");
+                return 1;
         }
-        g_object_unref(anim);
-        g_strfreev(env);
 
+
+        g_autoptr(GdkPixbufAnimationIter) anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
+        g_assert(anim_iter != NULL); /* animation iterator has been created. */
+
+        int nframes = 1;
+        while (gdk_pixbuf_animation_iter_advance(anim_iter, NULL)) {
+                if (nframes == 1) {
+                        g_autoptr(GdkPixbuf) pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
+                        g_assert(gdk_pixbuf_get_width(pixbuf) == 300 &&
+                                        gdk_pixbuf_get_height(pixbuf) == 300);
+                }
+
+                int delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
+                if (delay < 0 ||
+                    nframes > 15) {
+                        break;
+                }
+
+                /* check duration for various frames. */
+                switch (nframes) {
+                        case 5:
+                        case 10:
+                        case 4:
+                        case 9:
+                        case 14:
+                                g_assert(delay == 1000);
+                                break;
+                        case 1:
+                        case 6:
+                        case 11:
+                                g_assert(delay == 300);
+                                break;
+                        default:
+                                break;
+
+                }
+
+                nframes++;
+        }
+
+        g_assert(nframes == 15);
         return 0;
 }
