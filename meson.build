@@ -22,13 +22,13 @@ endif
 # -34/-64 is to overcome a Fedora bug in the .pc file
 gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: dirs)
 
-pbl_webp = shared_library('pixbufloader-webp',
-                          sources: ['io-webp.c', 'io-webp-anim.c'],
-                          dependencies: [gdkpb, webp, webpdemux],
-                          # Workaround for https://gitlab.gnome.org/GNOME/glib/issues/1413
-                          name_suffix: host_machine.system() == 'darwin' ? 'so' : [],
-                          install: true,
-                          install_dir: gdk_pb_moddir)
+pbl_webp = shared_module('pixbufloader-webp',
+                         sources: ['io-webp.c', 'io-webp-anim.c'],
+                         dependencies: [gdkpb, webp, webpdemux],
+                         # Workaround for https://gitlab.gnome.org/GNOME/glib/issues/1413
+                         name_suffix: host_machine.system() == 'darwin' ? 'so' : [],
+                         install: true,
+                         install_dir: gdk_pb_moddir)
 
 cdata = configuration_data()
 cdata.set('bindir', get_option('prefix') / get_option('bindir'))
