@@ -76,7 +76,6 @@ main(gint argc, gchar **argv) {
         gboolean hasAdv = TRUE;
         int cntFrames = 0;
         int delay = 0;
-        GTimeVal curTime;
         GdkPixbuf *pixbuf = NULL;
         anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
         g_assert((anim_iter != NULL)); /* animation iterator has been created. */
@@ -86,10 +85,12 @@ main(gint argc, gchar **argv) {
                         g_assert(delay == 1000);
                 }
 
-                gboolean has_new_frame = FALSE;
+                G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+                GTimeVal curTime;
                 g_get_current_time(&curTime);
-                has_new_frame = gdk_pixbuf_animation_iter_advance(anim_iter, &curTime);
-                if (has_new_frame) {
+                G_GNUC_END_IGNORE_DEPRECATIONS
+
+                if (gdk_pixbuf_animation_iter_advance(anim_iter, &curTime)) {
                         cntFrames += 1;
                         pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
                         int w = gdk_pixbuf_get_width(pixbuf);

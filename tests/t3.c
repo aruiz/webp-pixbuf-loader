@@ -2,29 +2,28 @@
 
 gint
 main(gint argc, gchar **argv) {
-        GError *error = NULL;
         gchar **env = g_get_environ();
         g_warning("%s", g_environ_getenv(env, "TEST_FILE"));
         GdkPixbufAnimation *anim = NULL;
-        GdkPixbufAnimationIter *anim_iter = NULL;
-        anim = gdk_pixbuf_animation_new_from_file(g_environ_getenv(env, "TEST_FILE"), &error);
+        anim = gdk_pixbuf_animation_new_from_file(g_environ_getenv(env, "TEST_FILE"), NULL);
         gboolean isStatic = gdk_pixbuf_animation_is_static_image(anim);
         if (!isStatic) {
-                gboolean hasAdv = TRUE;
-                int delay = 0;
                 int cntFrames = 0;
-                GdkPixbuf *pixbuf = NULL;
+
+                G_GNUC_BEGIN_IGNORE_DEPRECATIONS
                 GTimeVal curTime;
                 g_get_current_time(&curTime);
-                anim_iter = gdk_pixbuf_animation_get_iter(anim, &curTime);
-                while (hasAdv) {
-                        gboolean has_new_frame = FALSE;
+                G_GNUC_END_IGNORE_DEPRECATIONS
+
+                GdkPixbufAnimationIter *anim_iter = gdk_pixbuf_animation_get_iter(anim, &curTime);
+                while (TRUE) {
+                        G_GNUC_BEGIN_IGNORE_DEPRECATIONS
                         g_get_current_time(&curTime);
-                        has_new_frame = gdk_pixbuf_animation_iter_advance(anim_iter,
-                                                                          &curTime);
-                        if (has_new_frame) {
+                        G_GNUC_END_IGNORE_DEPRECATIONS
+
+                        if (gdk_pixbuf_animation_iter_advance(anim_iter, &curTime)) {
                                 cntFrames += 1;
-                                pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
+                                GdkPixbuf *pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
                                 int w = gdk_pixbuf_get_width(pixbuf);
                                 int h = gdk_pixbuf_get_height(pixbuf);
                                 if (cntFrames == 1) {
@@ -35,7 +34,7 @@ main(gint argc, gchar **argv) {
                         } else {
                                 break;
                         }
-                        delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
+                        int delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
                         if ((delay < 0) || (cntFrames > 100)) {
                                 break;
                         }
