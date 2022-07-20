@@ -10,11 +10,17 @@ webpdemux = dependency('libwebpdemux', version: '>0.4.3')
 gio2 = dependency('gio-2.0', version: '>2.56.0', method: 'pkg-config')
 gtk3 = dependency('gtk+-3.0', version: '>3.22.0', method: 'pkg-config', required: false)
 
-# -34/-64 is to overcome a Fedora bug in the .pc file
-# debian has a similar problem with its .pc file but it requires knowing the platform triad
 
-machine_triplet = run_command('gcc', '-dumpmachine', check: true).stdout().strip()
-gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: ['/usr/lib' / machine_triplet / 'gdk-pixbuf-2.0'])
+# This is a workaround since debian doesn't specify the query-loaders path in the .pc file
+# and it uses the platform triad in its path
+dirs = []
+if host_machine.system() == 'linux'
+  machine_triplet = run_command('gcc', '-dumpmachine', check: true).stdout().strip()
+  dirs = ['/usr/lib' / machine_triplet / 'gdk-pixbuf-2.0']
+endif
+
+# -34/-64 is to overcome a Fedora bug in the .pc file
+gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: dirs)
 
 pbl_webp = shared_library('pixbufloader-webp',
                           sources: ['io-webp.c', 'io-webp-anim.c'],
