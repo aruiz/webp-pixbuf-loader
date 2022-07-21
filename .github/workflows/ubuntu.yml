@@ -16,4 +16,5 @@ jobs:
       - run: mkdir build
       - run: meson build
       - run: ninja -C build
-      - run: ninja -C build test
+      - run: meson test -C build --print-errorlogs
+      - run: meson test -C build scan-build

@@ -32,4 +32,4 @@ jobs:
       - run: mkdir -p build
       - run: meson build
       - run: meson compile -C build
-      - run: meson test -C build
+      - run: meson test -C build --print-errorlogs
