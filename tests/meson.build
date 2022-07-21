@@ -1,10 +1,9 @@
 
 
-t1 = executable('t1', 't1.c',
-    link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux])
-t2 = executable('t2', 't2.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux])
-t3 = executable('t3', 't3.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux, gio2])
-t4 = executable('t4', 't4.c', link_with : pbl_webp, dependencies : [gdkpb, webp, webpdemux, gio2])
+t1 = executable('t1', 't1.c', dependencies : [gdkpb, webp, webpdemux])
+t2 = executable('t2', 't2.c', dependencies : [gdkpb, webp, webpdemux])
+t3 = executable('t3', 't3.c', dependencies : [gdkpb, webp, webpdemux])
+t4 = executable('t4', 't4.c', dependencies : [gdkpb, webp, webpdemux])
 
 loaders_data = configuration_data()
 loaders_data.set('MODULE_PATH', pbl_webp.full_path())

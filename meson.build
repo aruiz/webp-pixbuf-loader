@@ -7,7 +7,6 @@ endif
 gdk_pb_query_loaders = gdkpb.get_variable(pkgconfig: 'gdk_pixbuf_query_loaders')
 webp = dependency('libwebp', version: '>0.4.3')
 webpdemux = dependency('libwebpdemux', version: '>0.4.3')
-gio2 = dependency('gio-2.0', version: '>2.56.0', method: 'pkg-config')
 
 # This is a workaround since debian doesn't specify the query-loaders path in the .pc file
 # and it uses the platform triad in its path
