@@ -46,21 +46,20 @@ main(gint argc, gchar **argv)
                         case 4:
                         case 9:
                         case 14:
-                                g_assert(delay == 1000);
+                                g_assert_cmpint(delay, ==, 1000);
                                 break;
                         case 1:
                         case 6:
                         case 11:
-                                g_assert(delay == 300);
+                                g_assert_cmpint(delay, ==, 300);
                                 break;
                         default:
                                 break;
-
                 }
 
                 nframes++;
         }
 
-        g_assert(nframes == 15);
+        g_assert_cmpint(nframes, ==, 15);
         return 0;
 }
