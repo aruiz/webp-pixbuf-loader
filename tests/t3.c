@@ -21,12 +21,13 @@ main(gint argc, gchar **argv)
                 return 1;
         }
 
-
         g_autoptr(GdkPixbufAnimationIter) anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
         g_assert(anim_iter != NULL); /* animation iterator has been created. */
 
-        int nframes = 1;
-        while (gdk_pixbuf_animation_iter_advance(anim_iter, NULL)) {
+        int nframes;
+        for (nframes = 1; gdk_pixbuf_animation_iter_advance(anim_iter, NULL); nframes++) {
+                g_assert_cmpint(nframes, <=, 15);
+
                 if (nframes == 1) {
                         g_autoptr(GdkPixbuf) pixbuf = gdk_pixbuf_animation_iter_get_pixbuf(anim_iter);
                         g_assert(gdk_pixbuf_get_width(pixbuf) == 300 &&
@@ -34,17 +35,15 @@ main(gint argc, gchar **argv)
                 }
 
                 int delay = gdk_pixbuf_animation_iter_get_delay_time(anim_iter);
-                if (delay < 0 ||
-                    nframes > 15) {
+                if (delay == -1)
                         break;
-                }
 
                 /* check duration for various frames. */
                 switch (nframes) {
-                        case 5:
-                        case 10:
                         case 4:
+                        case 5:
                         case 9:
+                        case 10:
                         case 14:
                                 g_assert_cmpint(delay, ==, 1000);
                                 break;
@@ -56,8 +55,6 @@ main(gint argc, gchar **argv)
                         default:
                                 break;
                 }
-
-                nframes++;
         }
 
         g_assert_cmpint(nframes, ==, 15);
