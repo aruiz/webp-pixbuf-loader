@@ -223,29 +223,46 @@ gdk_pixbuf_webp_anim_finalize (GObject *object)
 {
         GdkPixbufWebpAnim *anim = GDK_PIXBUF_WEBP_ANIM (object);
 
-        if (anim->context->anim_incr.filedata) {
-                g_free (anim->context->anim_incr.filedata);
-                anim->context->anim_incr.filedata = NULL;
-        }
+        if (anim->context) {
+                if (anim->context->anim_incr.filedata) {
+                        g_free (anim->context->anim_incr.filedata);
+                        anim->context->anim_incr.filedata = NULL;
+                }
 
-        if (anim->context->anim_incr.accum_data) {
-                g_free (anim->context->anim_incr.accum_data);
-                anim->context->anim_incr.accum_data = NULL;
-                anim->context->anim_incr.used_len = 0;
+                if (anim->context->anim_incr.accum_data) {
+                        g_free (anim->context->anim_incr.accum_data);
+                        anim->context->anim_incr.accum_data = NULL;
+                        anim->context->anim_incr.used_len = 0;
+                }
         }
 
         if (anim->webp_iter) {
                 g_object_unref (anim->webp_iter);
                 anim->webp_iter = NULL;
         }
-        WebPAnimDecoderDelete (anim->dec);
-        g_free (anim->animInfo);
-        g_free (anim->decOptions);
-        if (anim->context->pixbuf) {
+
+        if (anim->dec) {
+                WebPAnimDecoderDelete (anim->dec);
+                anim->dec = NULL;
+        }
+
+        if (anim->animInfo) {
+                g_free (anim->animInfo);
+                anim->animInfo = NULL;
+        }
+
+        if (anim->decOptions) {
+                g_free (anim->decOptions);
+                anim->decOptions = NULL;
+        }
+
+        if (anim->context && anim->context->pixbuf) {
                 g_object_unref (anim->context->pixbuf);
                 anim->context->pixbuf = NULL;
         }
-        g_free (anim->context);   /* not handled in io-webp.c */
+
+        if (anim->context)
+                g_free (anim->context);   /* not handled in io-webp.c */
         anim->context = NULL;
 
         G_OBJECT_CLASS (gdk_pixbuf_webp_anim_parent_class)->finalize (object);
@@ -305,19 +322,25 @@ static void
 gdk_pixbuf_webp_anim_iter_finalize (GObject *object)
 {
         GdkPixbufWebpAnimIter *iter = GDK_PIXBUF_WEBP_ANIM_ITER (object);
+        if (!iter)
+                return;
 
         /* See the note on WebPDemuxGetFrame in webp/demux.h.
          * Also apparently WebPDemuxDelete does not need to be called
          * because we are not using the demux chunk calls.
          */
-        WebPDemuxReleaseIterator (iter->wpiter);
-        g_free (iter->wpiter);
-        iter->wpiter = NULL;
+        if (iter->wpiter) {
+                WebPDemuxReleaseIterator (iter->wpiter);
+                g_free (iter->wpiter);
+                iter->wpiter = NULL;
+        }
 
         /* webp_anim and iter have reciprocal references, hence this little dance. */
-        iter->webp_anim->webp_iter = NULL;
-        g_object_unref (iter->webp_anim);
-        iter->webp_anim = NULL;
+        if (iter->webp_anim) {
+                iter->webp_anim->webp_iter = NULL;
+                g_object_unref (iter->webp_anim);
+                iter->webp_anim = NULL;
+        }
 
         G_OBJECT_CLASS (gdk_pixbuf_webp_anim_iter_parent_class)->finalize (object);
 }
@@ -611,17 +634,18 @@ gdk_pixbuf__webp_image_load_animation_data (const guchar *buf,
         if (context && context->error && *(context->error))
                 g_print ("%s\n", (*(context->error))->message);
 
-        if (ptr_anim_info != NULL)
-                g_free (ptr_anim_info);
-
-        if (dec != NULL)
-                WebPAnimDecoderDelete (dec);
-
         if (animation != NULL)
                 (void) g_object_unref (animation);
+        else {
+                if (ptr_anim_info != NULL)
+                        g_free (ptr_anim_info);
 
-        if (dec_options != NULL)
-                g_free (dec_options);
+                if (dec != NULL)
+                        WebPAnimDecoderDelete (dec);
+
+                if (dec_options != NULL)
+                        g_free (dec_options);
+        }
 
         return NULL;
 }
