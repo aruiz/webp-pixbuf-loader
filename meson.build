@@ -1,4 +1,5 @@
 project('webp-pixbuf-loader', 'c', meson_version: '>=0.53')
+cc = meson.get_compiler('c')
 gdkpb = dependency('gdk-pixbuf-2.0', version: '>2.22.0', method: 'pkg-config')
 gdk_pb_moddir = get_option('gdk_pixbuf_moduledir')
 if gdk_pb_moddir == ''
@@ -18,6 +19,18 @@ endif
 
 # -34/-64 is to overcome a Fedora bug in the .pc file
 gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: dirs)
+
+headers = [
+  'endian.h',
+  'sys/endian.h',
+  'sys/byteorder.h',
+]
+
+foreach h : headers
+  if cc.has_header(h)
+    add_global_arguments('-DHAVE_' + h.underscorify().to_upper(), language : 'c')
+  endif
+endforeach
 
 pbl_webp = shared_module('pixbufloader-webp',
                          sources: ['io-webp.c', 'io-webp-anim.c'],
