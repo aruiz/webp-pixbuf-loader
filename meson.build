@@ -13,7 +13,7 @@ webpdemux = dependency('libwebpdemux', version: '>0.4.3')
 # and it uses the platform triad in its path
 dirs = []
 if host_machine.system() == 'linux'
-  machine_triplet = run_command('gcc', '-dumpmachine', check: true).stdout().strip()
+  machine_triplet = run_command(cc.get_id(), '-dumpmachine', check: true).stdout().strip()
   dirs = ['/usr/lib' / machine_triplet / 'gdk-pixbuf-2.0']
 endif
 
