@@ -20,15 +20,10 @@ endif
 # -34/-64 is to overcome a Fedora bug in the .pc file
 gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: dirs)
 
-headers = [
-  'endian.h',
-  'sys/endian.h',
-  'sys/byteorder.h',
-]
-
-foreach h : headers
-  if cc.has_header(h)
-    add_global_arguments('-DHAVE_' + h.underscorify().to_upper(), language : 'c')
+foreach header : ['endian.h', 'sys/endian.h', 'sys/byteorder.h']
+  if cc.has_header(header)
+    add_global_arguments('-DHAVE_' + header.underscorify().to_upper(), language : 'c')
+    break
   endif
 endforeach
 
