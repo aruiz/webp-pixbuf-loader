@@ -32,23 +32,8 @@ configure_file(input: 'webp-pixbuf.thumbnailer.in',
                install: true,
                install_dir: get_option('datadir') / 'thumbnailers')
 
-
-# This is a facility for people installing locally, distributions are encouraged to disable this option
-if get_option('update_cache')
-  # This is a workaround since debian doesn't specify the query-loaders path in the .pc file
-  # and it uses the platform triad in its path
-  dirs = []
-  if host_machine.system() == 'linux'
-    machine_triplet = run_command('gcc', '-dumpmachine', check: true).stdout().strip()
-    dirs = ['/usr/lib' / machine_triplet / 'gdk-pixbuf-2.0']
-  endif
-
-
-  gdk_pb_query_loaders = gdkpb.get_variable(pkgconfig: 'gdk_pixbuf_query_loaders')
-  # -34/-64 is to overcome a Fedora bug in the .pc file
-  gdk_pb_query_loaders = find_program(get_option('gdk_pixbuf_query_loaders_path'), gdk_pb_query_loaders, gdk_pb_query_loaders+'-32', gdk_pb_query_loaders+'-64', dirs: dirs)
-  meson.add_install_script(gdk_pb_query_loaders.path(), '--update-cache')
-endif
+warning('If you install this loader locally, make sure you rebuild the pixbuf loader cache')
+warning('To rebuild the cache run: `pkg-config gdk-pixbuf-2.0 --variable=gdk_pixbuf_query_loaders` > `pkg-config gdk-pixbuf-2.0 --variable=gdk_pixbuf_cache_file`')
 
 subdir('tests')
 
