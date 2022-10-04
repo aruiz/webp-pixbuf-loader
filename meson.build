@@ -9,12 +9,18 @@ endif
 webp = dependency('libwebp', version: '>0.4.3')
 webpdemux = dependency('libwebpdemux', version: '>0.4.3')
 
-foreach header : ['endian.h', 'sys/endian.h', 'sys/byteorder.h']
+has_endian_header = false
+headers = ['endian.h', 'sys/endian.h', 'sys/byteorder.h']
+foreach header : headers
   if cc.has_header(header)
+    has_endian_header = true
     add_global_arguments('-DHAVE_' + header.underscorify().to_upper(), language : 'c')
     break
   endif
 endforeach
+if has_endian_header == false
+  error('Could not find neither of these headers', headers)
+endif
 
 pbl_webp = shared_module('pixbufloader-webp',
                          sources: ['io-webp.c', 'io-webp-anim.c'],
