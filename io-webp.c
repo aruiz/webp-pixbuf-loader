@@ -12,10 +12,23 @@
 
 #include "io-webp.h"
 
-#if defined(HAVE_ENDIAN_H)
+/* endian.h is non-standard and platforms disagree with each other on it.
+ *
+ * * GLIBC (and its family) supports <endian.h>.
+ *
+ * * BSD libc provides <sys/endian.h> instead (Note that OpenBSD since
+ *   5.6 supports conventional function names).
+ *
+ * * macOS does not support <endian.h> but exposes another set of macros
+ *   in libkern.
+ */
+#if defined(__GLIBC__)
 #include <endian.h>
-#elif defined(HAVE_SYS_ENDIAN_H)
+#elif defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
 #include <sys/endian.h>
+#elif defined(__APPLE__)
+#include <libkern/OSByteOrder.h>
+#define le32toh(x) OSSwapLittleToHostInt32(x)
 #elif defined(HAVE_SYS_BYTEORDER_H)
 #include <sys/byteorder.h>
 #define le32toh(x) LE_32(x)
