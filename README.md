@@ -23,6 +23,11 @@ Building from source
   sudo dnf install libwebp-devel gdk-pixbuf2-devel meson gcc
   ```
 
+  Install dependencies on macOS via brew:
+  ```sh
+  $ brew install webp gdk-pixbuf meson ninja pkg-config
+  ```
+
   Install:
   ```
   sudo ninja -C builddir install
