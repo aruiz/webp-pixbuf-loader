@@ -5,8 +5,16 @@ t2 = executable('t2', 't2.c', dependencies : [gdkpb, webp, webpdemux])
 t3 = executable('t3', 't3.c', dependencies : [gdkpb, webp, webpdemux])
 t4 = executable('t4', 't4.c', dependencies : [gdkpb, webp, webpdemux])
 
+if meson.version().version_compare('>=0.54.0')
+  # The Meson fs.as_posix() feature was introduced in 0.54.0
+  fs = import('fs')
+  module_path = fs.as_posix(pbl_webp.full_path())
+else
+  module_path = pbl_webp.full_path().replace('\\', '/')
+endif
+
 loaders_data = configuration_data()
-loaders_data.set('MODULE_PATH', pbl_webp.full_path())
+loaders_data.set('MODULE_PATH', module_path)
 loaders = configure_file(input: 'loaders.cache.in',
                          output : 'loaders.cache',
                          configuration : loaders_data)
