@@ -655,7 +655,7 @@ gdk_pixbuf__webp_image_save_to_callback (GdkPixbufSaveFunc   save_func,
                                TRUE, NULL, &context);
 }
 
-void
+G_MODULE_EXPORT void
 fill_vtable (GdkPixbufModule *module)
 {
         module->load = gdk_pixbuf__webp_image_load;
@@ -667,7 +667,7 @@ fill_vtable (GdkPixbufModule *module)
         module->load_animation = gdk_pixbuf__webp_image_load_animation;
 }
 
-void
+G_MODULE_EXPORT void
 fill_info (GdkPixbufFormat *info)
 {
         static GdkPixbufModulePattern signature[] = {
