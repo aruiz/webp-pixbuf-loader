@@ -2,11 +2,11 @@
 
 gint
 main(gint argc, gchar **argv) {
-        g_autoptr(GdkPixbufAnimation) anim = gdk_pixbuf_animation_new_from_file(g_getenv("TEST_FILE"), NULL);
+        GdkPixbufAnimation *anim = gdk_pixbuf_animation_new_from_file(g_getenv("TEST_FILE"), NULL);
         g_assert(anim != NULL);
         g_assert(!gdk_pixbuf_animation_is_static_image(anim)); // Make sure it is an animation
 
-        g_autoptr(GdkPixbufAnimationIter) anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
+        GdkPixbufAnimationIter *anim_iter = gdk_pixbuf_animation_get_iter(anim, NULL);
         g_assert(anim_iter != NULL);
 
         int nframes;
@@ -31,5 +31,7 @@ main(gint argc, gchar **argv) {
                         g_assert_cmpint(delay, ==, 300);
         }
         g_assert(nframes == 15);
+        g_object_unref (anim_iter);
+        g_object_unref (anim);
         return 0;
 }
