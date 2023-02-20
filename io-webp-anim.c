@@ -495,7 +495,7 @@ get_data_from_file (FILE        *f,
         /* Check for RIFF and WEBP tags in WebP container header. */
         char tag[5];
         tag[4] = 0;
-        for (int i = 0; i < 4; i++) { tag[i] = *(gchar *) (data + i); }
+        for (int i = 0; i < 4; i++) { tag[i] = *((gchar *)data + i); }
         int rc2 = strcmp (tag, "RIFF");
         if (rc2 != 0) {
                 g_set_error (error,
@@ -504,7 +504,7 @@ get_data_from_file (FILE        *f,
                              "Cannot read WebP image header...");
                 return;
         }
-        for (int i = 0; i < 4; i++) { tag[i] = *(gchar *) (data + 8 + i); }
+        for (int i = 0; i < 4; i++) { tag[i] = *((gchar *)data + 8 + i); }
         rc2 = strcmp (tag, "WEBP");
         if (rc2 != 0) {
                 g_set_error (error,
