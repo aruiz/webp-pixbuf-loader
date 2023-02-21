@@ -19,7 +19,7 @@ typedef struct
 
 struct _GdkWebpAnimation
 {
-  GdkPixbufAnimation *parent_instance;
+  GdkPixbufAnimation parent_instance;
 };
 
 G_DEFINE_TYPE_WITH_PRIVATE (GdkWebpAnimation, gdk_webp_animation, GDK_TYPE_PIXBUF_ANIMATION)
@@ -27,10 +27,6 @@ G_DEFINE_TYPE_WITH_PRIVATE (GdkWebpAnimation, gdk_webp_animation, GDK_TYPE_PIXBU
 static void
 anim_finalize (GObject *self)
 {
-  GdkWebpAnimationPrivate *priv = gdk_webp_animation_get_instance_private (
-      GDK_WEBP_ANIMATION (self));
-  g_clear_object (&priv->cached_static_image);
-
   G_OBJECT_CLASS (gdk_webp_animation_parent_class)->finalize (self);
 }
 
@@ -39,11 +35,15 @@ anim_dispose (GObject *self)
 {
   GdkWebpAnimationPrivate *priv = gdk_webp_animation_get_instance_private (
       GDK_WEBP_ANIMATION (self));
+
   if (priv->anim_data)
     {
       g_byte_array_free (priv->anim_data, TRUE);
       priv->anim_data = NULL;
     }
+
+  g_clear_object (&priv->cached_static_image);
+
   G_OBJECT_CLASS (gdk_webp_animation_parent_class)->dispose (self);
 }
 
@@ -55,11 +55,42 @@ is_static_image (GdkPixbufAnimation *self)
   return priv->is_static;
 }
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+static GdkPixbufAnimationIter *
+get_iter (GdkPixbufAnimation *self, const GTimeVal *start_time)
+{
+  GdkWebpAnimationPrivate *priv = gdk_webp_animation_get_instance_private (
+      GDK_WEBP_ANIMATION (self));
+  GError               *error = NULL;
+  GdkWebpAnimationIter *iter
+      = gdk_webp_animation_new_from_buffer_and_time (priv->anim_data, start_time, &error);
+  if (error)
+    {
+      g_warning ("Could not instantiate WebP implementation of "
+                 "GdkPixbufAnimationIter: %s",
+                 error->message);
+      g_error_free (error);
+      return NULL;
+    }
+
+  return GDK_PIXBUF_ANIMATION_ITER (iter);
+}
+G_GNUC_END_IGNORE_DEPRECATIONS
+
 static GdkPixbuf *
 get_static_image (GdkPixbufAnimation *self)
 {
   GdkWebpAnimationPrivate *priv = gdk_webp_animation_get_instance_private (
       GDK_WEBP_ANIMATION (self));
+  if (! priv->cached_static_image)
+    {
+      GdkPixbufAnimationIter *iter = get_iter (self, NULL);
+      priv->cached_static_image    = gdk_pixbuf_animation_iter_get_pixbuf (
+          GDK_PIXBUF_ANIMATION_ITER (iter));
+      g_object_ref (priv->cached_static_image);
+      g_object_unref (iter);
+    }
+
   return priv->cached_static_image;
 }
 
@@ -73,14 +104,6 @@ get_size (GdkPixbufAnimation *self, gint *width, gint *height)
   if (height)
     *height = priv->frame_size.h;
 }
-
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-static GdkPixbufAnimationIter *
-get_iter (GdkPixbufAnimation *self, const GTimeVal *start_time)
-{
-  return NULL;
-}
-G_GNUC_END_IGNORE_DEPRECATIONS
 
 static void
 gdk_webp_animation_class_init (GdkWebpAnimationClass *klass)

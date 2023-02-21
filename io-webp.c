@@ -53,14 +53,18 @@ gdk_pixbuf__webp_image_stop_load (gpointer data, GError **error)
         {
           g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
                        "Could not get Pixbuf from WebP animation iter");
-          g_object_unref (anim);
-          g_object_unref (iter);
-          return FALSE;
+
+          WebPFreeDecBuffer (&context->deccfg.output);
+          g_clear_pointer (&context->idec, WebPIDelete);
+        }
+      else
+        {
+          context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
+          ret = TRUE;
         }
 
-      context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
-
-      g_object_unref (pb);
+      g_object_unref (anim);
+      g_object_unref (iter);
     }
 
   if (context->pixbuf != NULL)
