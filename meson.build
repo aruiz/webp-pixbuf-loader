@@ -1,4 +1,4 @@
-project('webp-pixbuf-loader', 'c', meson_version: '>=0.53')
+project('webp-pixbuf-loader', 'c', meson_version: '>=0.54')
 cc = meson.get_compiler('c')
 gdkpb = dependency('gdk-pixbuf-2.0', version: '>2.22.0', method: 'pkg-config')
 gdk_pb_moddir = get_option('gdk_pixbuf_moduledir')
@@ -8,14 +8,6 @@ endif
 
 webp = dependency('libwebp', version: '>0.4.3')
 webpdemux = dependency('libwebpdemux', version: '>0.4.3')
-
-foreach header : ['endian.h', 'sys/endian.h', 'sys/byteorder.h']
-  if cc.has_header(header)
-    has_endian_header = true
-    add_global_arguments('-DHAVE_' + header.underscorify().to_upper(), language : 'c')
-    break
-  endif
-endforeach
 
 pbl_webp = shared_module('pixbufloader-webp',
                          sources: ['io-webp.c', 'io-webp-anim.c', 'io-webp-anim-iter.c'],
