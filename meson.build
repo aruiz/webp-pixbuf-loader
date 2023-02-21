@@ -18,7 +18,7 @@ foreach header : ['endian.h', 'sys/endian.h', 'sys/byteorder.h']
 endforeach
 
 pbl_webp = shared_module('pixbufloader-webp',
-                         sources: ['io-webp.c', 'io-webp-anim.c'],
+                         sources: ['io-webp.c', 'io-webp-anim.c', 'io-webp-anim-iter.c'],
                          dependencies: [gdkpb, webp, webpdemux],
                          # Workaround for https://gitlab.gnome.org/GNOME/glib/issues/1413
                          name_suffix: host_machine.system() == 'darwin' ? 'so' : [],
