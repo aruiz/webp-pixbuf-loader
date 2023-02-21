@@ -11,6 +11,7 @@
  */
 
 #include "io-webp.h"
+#include "io-webp-anim.h"
 
 static gpointer
 gdk_pixbuf__webp_image_begin_load(GdkPixbufModuleSizeFunc size_func,
@@ -31,16 +32,32 @@ gdk_pixbuf__webp_image_begin_load(GdkPixbufModuleSizeFunc size_func,
   return context;
 }
 
-static gboolean gdk_pixbuf__webp_image_stop_load(gpointer data,
+static gboolean
+gdk_pixbuf__webp_image_stop_load(gpointer data,
                                                  GError **error) {
   WebPContext *context = (WebPContext *)data;
   gboolean ret = FALSE;
 
   if (context->anim_buffer) {
-    g_byte_array_free (context->anim_buffer);
+    GdkWebpAnimation *anim = gdk_webp_animation_new_from_bytes(context->anim_buffer, error);
+    context->anim_buffer = NULL;
+
+    GdkPixbufAnimationIter *iter = gdk_pixbuf_animation_get_iter (GDK_PIXBUF_ANIMATION (anim), NULL);
+
+    GdkPixbuf *pb = gdk_pixbuf_animation_iter_get_pixbuf (iter);
+    if (pb == NULL) {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED, "Could not get Pixbuf from WebP animation iter");
+      g_object_unref (anim);
+      g_object_unref (iter);
+      return FALSE;
+    }
+
+    context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
+
+    g_object_unref (pb);
   }
 
-  if (context->pixbuf) {
+  if (context->pixbuf != NULL) {
     gint w = gdk_pixbuf_get_width(context->pixbuf);
     gint h = gdk_pixbuf_get_height(context->pixbuf);
     context->update_func(context->pixbuf, 0, 0, w, h, context->user_data);
@@ -60,10 +77,6 @@ static gboolean gdk_pixbuf__webp_image_load_increment(gpointer data,
                                                       const guchar *buf,
                                                       guint size,
                                                       GError **error) {
-  if (error) {
-    *error = NULL;
-  }
-
   WebPContext *context = (WebPContext *)data;
   if (context->got_header == FALSE) {
     gint width, height;
@@ -150,7 +163,8 @@ static gboolean gdk_pixbuf__webp_image_load_increment(gpointer data,
   return TRUE;
 }
 
-void fill_vtable(GdkPixbufModule *module) {
+G_MODULE_EXPORT void
+fill_vtable(GdkPixbufModule *module) {
   // module->load = gdk_pixbuf__webp_image_load;
   module->begin_load = gdk_pixbuf__webp_image_begin_load;
   module->stop_load = gdk_pixbuf__webp_image_stop_load;
@@ -160,7 +174,8 @@ void fill_vtable(GdkPixbufModule *module) {
   //  module->load_animation = gdk_pixbuf__webp_image_load_animation;
 }
 
-void fill_info(GdkPixbufFormat *info) {
+G_MODULE_EXPORT void
+fill_info(GdkPixbufFormat *info) {
   static GdkPixbufModulePattern signature[] = {
       {"RIFFsizeWEBP", "    xxxx    ", 100}, {NULL, NULL, 0}};
 
