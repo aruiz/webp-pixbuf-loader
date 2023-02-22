@@ -4,7 +4,6 @@ gint
 main (gint argc, gchar **argv)  {
   gchar **env = g_get_environ();
 
-  g_warning("%s", g_environ_getenv(env, "TEST_FILE"));
   GdkPixbufFormat *format = gdk_pixbuf_get_file_info (g_environ_getenv(env, "TEST_FILE"), NULL, NULL);
 
   g_assert(format != NULL);
@@ -13,6 +12,5 @@ main (gint argc, gchar **argv)  {
   g_free (name);
 
   g_strfreev (env);
-  gdk_pixbuf_format_free (format);
   return 0;
 }
