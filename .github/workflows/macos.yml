@@ -2,6 +2,11 @@ name: WebP Pixbuf CI [MacOS]
 
 on:
   push:
+    branches:
+      - mainline
+  pull_request:
+    branches:
+      - mainline
 
 jobs:
   Build:
