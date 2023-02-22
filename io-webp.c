@@ -14,7 +14,7 @@
 #include "io-webp-anim.h"
 
 static gpointer
-gdk_pixbuf__webp_image_begin_load (GdkPixbufModuleSizeFunc     size_func,
+begin_load (GdkPixbufModuleSizeFunc     size_func,
                                    GdkPixbufModulePreparedFunc prepare_func,
                                    GdkPixbufModuleUpdatedFunc  update_func,
                                    gpointer                    user_data,
@@ -35,57 +35,7 @@ gdk_pixbuf__webp_image_begin_load (GdkPixbufModuleSizeFunc     size_func,
 }
 
 static gboolean
-gdk_pixbuf__webp_image_stop_load (gpointer data, GError **error)
-{
-  WebPContext *context = (WebPContext *) data;
-  gboolean     ret     = FALSE;
-
-  if (context->anim_buffer)
-    {
-      GdkWebpAnimation *anim = gdk_webp_animation_new_from_bytes (context->anim_buffer, error);
-      context->anim_buffer = NULL;
-
-      GdkPixbufAnimationIter *iter
-          = gdk_pixbuf_animation_get_iter (GDK_PIXBUF_ANIMATION (anim), NULL);
-
-      GdkPixbuf *pb = gdk_pixbuf_animation_iter_get_pixbuf (iter);
-      if (pb == NULL)
-        {
-          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                       "Could not get Pixbuf from WebP animation iter");
-
-          WebPFreeDecBuffer (&context->deccfg.output);
-          g_clear_pointer (&context->idec, WebPIDelete);
-        }
-      else
-        {
-          context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
-          ret = TRUE;
-        }
-
-      g_object_unref (anim);
-      g_object_unref (iter);
-    }
-
-  if (context->pixbuf != NULL)
-    {
-      gint w = gdk_pixbuf_get_width (context->pixbuf);
-      gint h = gdk_pixbuf_get_height (context->pixbuf);
-      context->update_func (context->pixbuf, 0, 0, w, h, context->user_data);
-      ret = TRUE;
-    }
-
-  WebPFreeDecBuffer (&context->deccfg.output);
-
-  g_clear_pointer (&context->idec, WebPIDelete);
-  g_clear_object (&context->pixbuf);
-  g_free (context);
-
-  return ret;
-}
-
-static gboolean
-gdk_pixbuf__webp_image_load_increment (gpointer data, const guchar *buf, guint size, GError **error)
+load_increment (gpointer data, const guchar *buf, guint size, GError **error)
 {
   WebPContext *context = (WebPContext *) data;
   if (context->got_header == FALSE)
@@ -178,16 +128,62 @@ gdk_pixbuf__webp_image_load_increment (gpointer data, const guchar *buf, guint s
   return TRUE;
 }
 
+static gboolean
+stop_load (gpointer data, GError **error)
+{
+  WebPContext *context = (WebPContext *) data;
+  gboolean     ret     = FALSE;
+
+  if (context->anim_buffer)
+    {
+      GdkWebpAnimation *anim = gdk_webp_animation_new_from_bytes (context->anim_buffer, error);
+      context->anim_buffer = NULL;
+
+      GdkPixbufAnimationIter *iter
+          = gdk_pixbuf_animation_get_iter (GDK_PIXBUF_ANIMATION (anim), NULL);
+
+      GdkPixbuf *pb = gdk_pixbuf_animation_iter_get_pixbuf (iter);
+      if (pb == NULL)
+        {
+          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                       "Could not get Pixbuf from WebP animation iter");
+
+          WebPFreeDecBuffer (&context->deccfg.output);
+          g_clear_pointer (&context->idec, WebPIDelete);
+        }
+      else
+        {
+          context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
+          ret = TRUE;
+        }
+
+      g_object_unref (anim);
+      g_object_unref (iter);
+    }
+
+  if (context->pixbuf != NULL)
+    {
+      gint w = gdk_pixbuf_get_width (context->pixbuf);
+      gint h = gdk_pixbuf_get_height (context->pixbuf);
+      context->update_func (context->pixbuf, 0, 0, w, h, context->user_data);
+      ret = TRUE;
+    }
+
+  WebPFreeDecBuffer (&context->deccfg.output);
+
+  g_clear_pointer (&context->idec, WebPIDelete);
+  g_clear_object (&context->pixbuf);
+  g_free (context);
+
+  return ret;
+}
+
 G_MODULE_EXPORT void
 fill_vtable (GdkPixbufModule *module)
 {
-  // module->load = gdk_pixbuf__webp_image_load;
-  module->begin_load     = gdk_pixbuf__webp_image_begin_load;
-  module->stop_load      = gdk_pixbuf__webp_image_stop_load;
-  module->load_increment = gdk_pixbuf__webp_image_load_increment;
-  // module->save = gdk_pixbuf__webp_image_save;
-  // module->save_to_callback = gdk_pixbuf__webp_image_save_to_callback;
-  //  module->load_animation = gdk_pixbuf__webp_image_load_animation;
+  module->begin_load     = begin_load;
+  module->stop_load      = stop_load;
+  module->load_increment = load_increment;
 }
 
 G_MODULE_EXPORT void
