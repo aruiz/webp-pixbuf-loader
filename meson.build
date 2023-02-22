@@ -26,7 +26,6 @@ configure_file(input: 'webp-pixbuf.thumbnailer.in',
                install_dir: get_option('datadir') / 'thumbnailers')
 
 warning('If you install this loader locally, make sure you rebuild the pixbuf loader cache')
-warning('To rebuild the cache run: `pkg-config gdk-pixbuf-2.0 --variable=gdk_pixbuf_query_loaders` > `pkg-config gdk-pixbuf-2.0 --variable=gdk_pixbuf_cache_file`')
+warning('To rebuild the cache run: `pkg-config gdk-pixbuf-2.0 --variable=gdk_pixbuf_query_loaders` --update-cache')
 
 subdir('tests')
-
