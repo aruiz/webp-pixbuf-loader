@@ -16,5 +16,6 @@ jobs:
       - run: mkdir build
       - run: meson build
       - run: ninja -C build
+      - run: ninja -C build scan-build
       - run: meson test -C build --print-errorlogs
-      - run: meson test -C build scan-build
+      - run: meson test -C build --wrapper 'valgrind --leak-check=full --error-exitcode=1'
