@@ -1,6 +1,8 @@
 WebP GDK Pixbuf Loader library
 ==============================
 ![](https://github.com/aruiz/webp-pixbuf-loader/actions/workflows/ubuntu.yml/badge.svg)
+![](https://github.com/aruiz/webp-pixbuf-loader/actions/workflows/macos.yml/badge.svg)
+![](https://github.com/aruiz/webp-pixbuf-loader/actions/workflows/msys2.yml/badge.svg)
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/webp-pixbuf-loader.svg?exclude_unsupported=1)](https://repology.org/project/webp-pixbuf-loader/versions)
 
