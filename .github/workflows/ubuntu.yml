@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt update
-      - run: sudo apt install ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev
+      - run: sudo apt install ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev valgrind
       - run: mkdir build
       - run: meson build
       - run: ninja -C build
