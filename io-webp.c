@@ -1,7 +1,7 @@
 /* GdkPixbuf library - WebP Image Loader
  *
  * SPDX-License-Identifier: LGPL-2.0-or-later
- * Copyright (C) 2011 Alberto Ruiz
+ * Copyright (C) 2022 Alberto Ruiz
  * Copyright (C) 2011 David Mazary
  * Copyright (C) 2014 Přemysl Janouch
  *

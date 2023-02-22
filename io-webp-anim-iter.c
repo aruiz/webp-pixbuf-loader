@@ -1,3 +1,13 @@
+/* GdkPixbuf library - WebP Image Loader
+ *
+ * SPDX-License-Identifier: LGPL-2.0-or-later
+ * Copyright (C) 2021 Alan Hawrelak
+ * Copyright (C) 2022 Alberto Ruiz
+ *
+ * Authors: Alan Hawrelak <alangh@shaw.ca>
+ *          Alberto Ruiz  <aruiz@gnome.org>
+ */
+
 #include "io-webp-anim.h"
 
 #include <webp/decode.h>
