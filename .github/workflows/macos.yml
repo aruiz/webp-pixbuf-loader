@@ -1,0 +1,15 @@
+name: WebP Pixbuf CI [MacOS]
+
+on:
+  push:
+
+jobs:
+  Build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: brew update
+      - run: brew install webp gdk-pixbuf meson ninja pkg-config
+      - run: meson setup build
+      - run: meson compile -C build --verbose
+      - run: meson test -C build --print-errorlogs
