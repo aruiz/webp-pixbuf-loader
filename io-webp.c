@@ -15,10 +15,10 @@
 
 static gpointer
 begin_load (GdkPixbufModuleSizeFunc     size_func,
-                                   GdkPixbufModulePreparedFunc prepare_func,
-                                   GdkPixbufModuleUpdatedFunc  update_func,
-                                   gpointer                    user_data,
-                                   GError                    **error)
+            GdkPixbufModulePreparedFunc prepare_func,
+            GdkPixbufModuleUpdatedFunc  update_func,
+            gpointer                    user_data,
+            GError                    **error)
 {
   WebPContext *context  = g_new0 (WebPContext, 1);
   context->size_func    = size_func;
@@ -90,12 +90,21 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
 
       context->deccfg.output.colorspace = features.has_alpha ? MODE_RGBA : MODE_RGB;
 
-      guint len = 0;
+      guint len                                 = 0;
+      context->deccfg.output.is_external_memory = TRUE;
       context->deccfg.output.u.RGBA.rgba
           = gdk_pixbuf_get_pixels_with_length (context->pixbuf, &len);
       context->deccfg.output.u.RGBA.stride = gdk_pixbuf_get_rowstride (context->pixbuf);
       context->deccfg.output.u.RGBA.size = (size_t) len;
       context->idec = WebPIDecode (NULL, 0, &context->deccfg);
+
+      if (context->idec == NULL)
+        {
+          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+                       "Could not allocate WebPIDecode");
+          g_clear_object (&context->pixbuf);
+          return FALSE;
+        }
 
       context->prepare_func (context->pixbuf, NULL, context->user_data);
     }
@@ -168,8 +177,6 @@ stop_load (gpointer data, GError **error)
       context->update_func (context->pixbuf, 0, 0, w, h, context->user_data);
       ret = TRUE;
     }
-
-  WebPFreeDecBuffer (&context->deccfg.output);
 
   g_clear_pointer (&context->idec, WebPIDelete);
   g_clear_object (&context->pixbuf);
