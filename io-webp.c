@@ -185,12 +185,201 @@ stop_load (gpointer data, GError **error)
   return ret;
 }
 
+/* pixbuf save logic */
+
+/* Encoder write callback to accumulate output data in a FILE stream */
+static int
+write_file (const uint8_t *data, size_t data_size, const WebPPicture *const pic)
+{
+  FILE *const out = (FILE *) pic->custom_ptr;
+  return data_size ? (fwrite (data, data_size, 1, out) == 1) : 1;
+}
+
+/* Encoder write callback to accumulate output data in a GByteArray */
+static int
+write_array (const uint8_t *data, size_t data_size, const WebPPicture *const pic)
+{
+  GByteArray *arr = pic->custom_ptr;
+  g_byte_array_append (arr, data, data_size);
+  return TRUE;
+}
+
+static gboolean
+save_webp (GdkPixbuf        *pixbuf,
+           gchar           **keys,
+           gchar           **values,
+           GError          **error,
+           GdkPixbufSaveFunc save_func,
+           FILE             *f,
+           gpointer         *user_data)
+{
+  WebPPicture picture;
+  WebPConfig  config;
+
+  if (! WebPPictureInit (&picture) || ! WebPConfigInit (&config))
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
+                   "WebP encoder version mismatch.");
+      return FALSE;
+    }
+
+  if (keys && *keys && values && *values)
+    {
+      gchar **kiter = keys;
+      gchar **viter = values;
+
+      while (*kiter)
+        {
+          if (strncmp (*kiter, "quality", 7) == 0)
+            {
+              float quality = (float) g_ascii_strtod (*viter, NULL);
+              if (quality < 0 || quality > 100)
+                {
+                  g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
+                               "WebP quality must be a value between 0 and "
+                               "100.");
+                  return FALSE;
+                }
+              config.quality = quality;
+            }
+          else if (strncmp (*kiter, "preset", 6) == 0)
+            {
+              gchar     *PRESET_KEYS[7] = { "default", "picture", "photo",
+                                            "drawing", "icon",    "text",
+                                            NULL };
+              WebPPreset PRESET_VALS[7] = { WEBP_PRESET_DEFAULT,
+                                            WEBP_PRESET_PICTURE,
+                                            WEBP_PRESET_PHOTO,
+                                            WEBP_PRESET_DRAWING,
+                                            WEBP_PRESET_ICON,
+                                            WEBP_PRESET_TEXT,
+                                            0 };
+              gboolean   preset_set     = FALSE;
+
+              for (gchar **key = PRESET_KEYS; *key; key++)
+                {
+                  if (g_strcmp0 (*viter, *key) != 0)
+                    continue;
+
+                  if (WebPConfigPreset (&config, PRESET_VALS[key - PRESET_KEYS],
+                                        config.quality)
+                      == 0)
+                    {
+                      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                                   "Could not initialize decoder with "
+                                   "preset.");
+                      return FALSE;
+                    }
+                  preset_set = TRUE;
+                  break;
+                }
+
+              if (! preset_set)
+                {
+                  g_warning ("Invalid WebP preset '%s', ignoring.", *viter);
+                }
+            }
+
+          ++kiter;
+          ++viter;
+        }
+    }
+
+  if (WebPValidateConfig (&config) != 1)
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
+                   "Invalid WebP encoding configuration");
+      return FALSE;
+    }
+
+  picture.width  = gdk_pixbuf_get_width (pixbuf);
+  picture.height = gdk_pixbuf_get_height (pixbuf);
+  gint rowstride = gdk_pixbuf_get_rowstride (pixbuf);
+
+  if ((gdk_pixbuf_get_has_alpha (pixbuf)
+           ? WebPPictureImportRGBA (&picture, gdk_pixbuf_get_pixels (pixbuf), rowstride)
+           : WebPPictureImportRGB (&picture, gdk_pixbuf_get_pixels (pixbuf), rowstride))
+      == FALSE)
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_INSUFFICIENT_MEMORY,
+                   "Failed to allocate picture");
+      WebPPictureFree (&picture);
+      return FALSE;
+    }
+
+  if (save_func)
+    {
+      picture.writer     = write_array;
+      picture.custom_ptr = (void *) g_byte_array_new ();
+    }
+  else if (f)
+    {
+      picture.writer     = write_file;
+      picture.custom_ptr = (void *) f;
+    }
+  else
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
+                   "Save webp called without callback nor FILE stream value");
+      WebPPictureFree (&picture);
+      return FALSE;
+    }
+
+  if (WebPEncode (&config, &picture) == FALSE)
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
+                   "Could not encode WebP data");
+      if (save_func && picture.custom_ptr)
+        g_byte_array_free ((GByteArray *) picture.custom_ptr, TRUE);
+      WebPPictureFree (&picture);
+      return FALSE;
+    }
+
+  if (save_func)
+    {
+      GByteArray *arr = (GByteArray *) picture.custom_ptr;
+      save_func ((const gchar *) arr->data, arr->len, error, user_data);
+      g_byte_array_free (arr, TRUE);
+
+      if (*error)
+        {
+          WebPPictureFree (&picture);
+          return FALSE;
+        }
+    }
+
+  WebPPictureFree (&picture);
+  return TRUE;
+}
+
+static gboolean
+save (FILE *f, GdkPixbuf *pixbuf, gchar **keys, gchar **values, GError **error)
+{
+  return save_webp (pixbuf, keys, values, error, NULL, f, NULL);
+}
+
+static gboolean
+save_to_callback (GdkPixbufSaveFunc save_func,
+                  gpointer          user_data,
+                  GdkPixbuf        *pixbuf,
+                  gchar           **keys,
+                  gchar           **values,
+                  GError          **error)
+{
+  return save_webp (pixbuf, keys, values, error, save_func, NULL, user_data);
+}
+
+/* module entry points */
+
 G_MODULE_EXPORT void
 fill_vtable (GdkPixbufModule *module)
 {
   module->begin_load     = begin_load;
   module->stop_load      = stop_load;
   module->load_increment = load_increment;
+
+  module->save             = save;
+  module->save_to_callback = save_to_callback;
 }
 
 G_MODULE_EXPORT void
@@ -211,6 +400,6 @@ fill_info (GdkPixbufFormat *info)
   info->description = "The WebP image format";
   info->mime_types  = mime_types;
   info->extensions  = extensions;
-  info->flags       = GDK_PIXBUF_FORMAT_THREADSAFE;
+  info->flags       = GDK_PIXBUF_FORMAT_WRITABLE | GDK_PIXBUF_FORMAT_THREADSAFE;
   info->license     = "LGPL";
 }
