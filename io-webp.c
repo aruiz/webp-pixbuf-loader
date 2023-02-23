@@ -232,15 +232,10 @@ save_webp (GdkPixbuf        *pixbuf,
         {
           if (strncmp (*kiter, "quality", 7) == 0)
             {
-              float quality = (float) g_ascii_strtod (*viter, NULL);
-              if (quality < 0 || quality > 100)
-                {
-                  g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
-                               "WebP quality must be a value between 0 and "
-                               "100.");
-                  return FALSE;
-                }
-              config.quality = quality;
+              guint64 quality;
+              if (! g_ascii_string_to_unsigned (*viter, 10, 0, 100, &quality, error))
+                return FALSE;
+              config.quality = (float) quality;
             }
           else if (strncmp (*kiter, "preset", 6) == 0)
             {
