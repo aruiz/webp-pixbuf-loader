@@ -205,6 +205,18 @@ write_array (const uint8_t *data, size_t data_size, const WebPPicture *const pic
 }
 
 static gboolean
+is_save_option_supported (const gchar *option_key)
+{
+  char *options[3] = { "quality", "preset", NULL };
+  for (char **o = options; *o; o++)
+    {
+      if (g_strcmp0 (*o, option_key) == 0)
+        return TRUE;
+    }
+  return FALSE;
+}
+
+static gboolean
 save_webp (GdkPixbuf        *pixbuf,
            gchar           **keys,
            gchar           **values,
@@ -375,6 +387,8 @@ fill_vtable (GdkPixbufModule *module)
 
   module->save             = save;
   module->save_to_callback = save_to_callback;
+
+  module->is_save_option_supported = is_save_option_supported;
 }
 
 G_MODULE_EXPORT void
