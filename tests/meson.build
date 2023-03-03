@@ -15,7 +15,7 @@ loaders = configure_file(input: 'loaders.cache.in',
                          configuration : loaders_data)
 
 test_env = ['GDK_PIXBUF_MODULE_FILE=' + meson.current_build_dir() / 'loaders.cache']
-test_file_base = 'TEST_FILE=' + meson.current_source_dir()
+test_file_base = 'TEST_FILE=' + meson.current_source_dir() / 'data'
 
 test('load 1x1 image',     t1, env : test_env + [ test_file_base / 't1.webp'])
 test('load 200x200 image', t2, env : test_env + [ test_file_base / 't2.webp'])
