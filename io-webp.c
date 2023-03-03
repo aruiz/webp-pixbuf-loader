@@ -12,6 +12,7 @@
 
 #include "io-webp.h"
 #include "io-webp-anim.h"
+#include <webp/mux.h>
 
 static gpointer
 begin_load (GdkPixbufModuleSizeFunc     size_func,
@@ -192,7 +193,7 @@ static int
 write_file (const uint8_t *data, size_t data_size, const WebPPicture *const pic)
 {
   FILE *const out = (FILE *) pic->custom_ptr;
-  return data_size ? (fwrite (data, data_size, 1, out) == 1) : 1;
+  return data_size == fwrite (data, sizeof (guchar), data_size, out) ? TRUE : FALSE;
 }
 
 /* Encoder write callback to accumulate output data in a GByteArray */
@@ -207,13 +208,47 @@ write_array (const uint8_t *data, size_t data_size, const WebPPicture *const pic
 static gboolean
 is_save_option_supported (const gchar *option_key)
 {
-  char *options[3] = { "quality", "preset", NULL };
+  char *options[4] = { "quality", "preset", "icc-profile", NULL };
   for (char **o = options; *o; o++)
     {
       if (g_strcmp0 (*o, option_key) == 0)
         return TRUE;
     }
   return FALSE;
+}
+
+/* Creates a new image data buffer with the ICC profile data in it */
+WebPData
+add_icc_data (WebPData *image_data, WebPData *icc_data, GError **error)
+{
+  WebPMux *mux = WebPMuxCreate (image_data, FALSE);
+
+  if (mux == NULL)
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                   "Could not create WebPMux instance");
+      return (WebPData){ 0 };
+    }
+
+  if (WebPMuxSetChunk (mux, "ICCP", icc_data, FALSE) != WEBP_MUX_OK)
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                   "Could not set ICC profile data WebP using Muxer");
+      WebPMuxDelete (mux);
+      return (WebPData){ 0 };
+    }
+
+  WebPData output = { 0 };
+  if (WebPMuxAssemble (mux, &output) != WEBP_MUX_OK)
+    {
+      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                   "Could not assemble WebP data using Muxer");
+      WebPMuxDelete (mux);
+      return (WebPData){ 0 };
+    }
+
+  WebPMuxDelete (mux);
+  return output;
 }
 
 static gboolean
@@ -227,6 +262,10 @@ save_webp (GdkPixbuf        *pixbuf,
 {
   WebPPicture picture;
   WebPConfig  config;
+  uint8_t    *icc_data     = NULL;
+  gsize       icc_data_len = 0;
+
+  g_clear_error (error);
 
   if (! WebPPictureInit (&picture) || ! WebPConfigInit (&config))
     {
@@ -242,14 +281,18 @@ save_webp (GdkPixbuf        *pixbuf,
 
       while (*kiter)
         {
-          if (strncmp (*kiter, "quality", 7) == 0)
+          if (g_strcmp0 (*kiter, "quality") == 0)
             {
               guint64 quality;
               if (! g_ascii_string_to_unsigned (*viter, 10, 0, 100, &quality, error))
                 return FALSE;
               config.quality = (float) quality;
             }
-          else if (strncmp (*kiter, "preset", 6) == 0)
+          else if (g_strcmp0 (*kiter, "icc-profile") == 0)
+            {
+              icc_data = g_base64_decode (*viter, &icc_data_len);
+            }
+          else if (g_strcmp0 (*kiter, "preset") == 0)
             {
               gchar     *PRESET_KEYS[7] = { "default", "picture", "photo",
                                             "drawing", "icon",    "text",
@@ -314,12 +357,14 @@ save_webp (GdkPixbuf        *pixbuf,
       return FALSE;
     }
 
-  if (save_func)
+  gboolean uses_array = save_func || icc_data;
+
+  if (uses_array)
     {
       picture.writer     = write_array;
       picture.custom_ptr = (void *) g_byte_array_new ();
     }
-  else if (f)
+  else if (f && ! icc_data)
     {
       picture.writer     = write_file;
       picture.custom_ptr = (void *) f;
@@ -336,26 +381,45 @@ save_webp (GdkPixbuf        *pixbuf,
     {
       g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_BAD_OPTION,
                    "Could not encode WebP data");
-      if (save_func && picture.custom_ptr)
+      if ((save_func || icc_data) && picture.custom_ptr)
         g_byte_array_free ((GByteArray *) picture.custom_ptr, TRUE);
       WebPPictureFree (&picture);
       return FALSE;
     }
 
-  if (save_func)
-    {
-      GByteArray *arr = (GByteArray *) picture.custom_ptr;
-      save_func ((const gchar *) arr->data, arr->len, error, user_data);
-      g_byte_array_free (arr, TRUE);
+  gpointer custom_ptr = picture.custom_ptr;
+  WebPPictureFree (&picture);
 
-      if (*error)
+  if (uses_array)
+    {
+      WebPData data; // NOTE We can't do field initialization since we can't get length after free
+      data.size  = ((GByteArray *) custom_ptr)->len;
+      data.bytes = g_byte_array_free ((GByteArray *) custom_ptr, FALSE);
+
+      if (icc_data)
         {
-          WebPPictureFree (&picture);
-          return FALSE;
+          WebPData icc_wpdata = { .bytes = icc_data, .size = icc_data_len };
+
+          WebPData output = add_icc_data (&data, &icc_wpdata, error);
+          g_clear_pointer (&icc_data, g_free);
+          g_free ((gpointer) data.bytes);
+
+          if (output.bytes == NULL)
+            return FALSE;
+
+          data = output;
         }
+
+      gboolean ret = FALSE;
+      if (save_func)
+        ret = save_func ((const gchar *) data.bytes, data.size, error, user_data);
+      else if (f)
+        ret = fwrite (data.bytes, sizeof (guchar), data.size, f) == data.size ? TRUE : FALSE;
+
+      WebPDataClear (&data);
+      return ret;
     }
 
-  WebPPictureFree (&picture);
   return TRUE;
 }
 
