@@ -30,6 +30,22 @@ test_webp_icc_output (guchar *buffer, gsize buf_size, const gchar *base64_string
   g_free (encoded_icc);
 }
 
+void
+test_webp_icc_read (const gchar *path) {
+  GError *error = NULL;
+
+  GdkPixbuf *icc_pixbuf = gdk_pixbuf_new_from_file (path, &error);
+  if (error)
+    g_error ("%s", error->message);
+  g_assert (icc_pixbuf != NULL);
+
+  const gchar* icc_option = gdk_pixbuf_get_option (icc_pixbuf, "icc-profile");
+  g_assert (icc_option != NULL);
+  g_assert_cmpstr ("MQo=", ==, icc_option);
+
+  g_clear_object (&icc_pixbuf);
+}
+
 gint
 main (gint argc, gchar **argv)
 {
@@ -61,6 +77,10 @@ main (gint argc, gchar **argv)
     g_error ("%s", error->message);
 
   test_webp_icc_output ((guchar *) buffer, buf_size, "MQo=");
+
+  /* Test icc-profile read */
+  test_webp_icc_read (path);
+
   g_remove (path);
   g_clear_pointer (&buffer, g_free);
   g_clear_pointer (&path, g_free);

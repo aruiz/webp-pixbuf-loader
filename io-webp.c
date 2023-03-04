@@ -10,9 +10,32 @@
  *          Přemysl Janouch <p.janouch@gmail.com>
  */
 
-#include "io-webp.h"
-#include "io-webp-anim.h"
+#include <string.h>
+
+#include <webp/decode.h>
+#include <webp/encode.h>
 #include <webp/mux.h>
+
+#define GDK_PIXBUF_ENABLE_BACKEND
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#undef GDK_PIXBUF_ENABLE_BACKEND
+
+#include "io-webp-anim.h"
+
+typedef struct
+{
+  GdkPixbufModuleSizeFunc     size_func;
+  GdkPixbufModuleUpdatedFunc  update_func;
+  GdkPixbufModulePreparedFunc prepare_func;
+  gpointer                    user_data;
+  WebPDecoderConfig           deccfg;
+  gboolean                    got_header;
+  gboolean                    is_animation;
+  gboolean                    has_alpha;
+  GByteArray                 *buffer;
+  gint                        canvas_w;
+  gint                        canvas_h;
+} WebPContext;
 
 static gpointer
 begin_load (GdkPixbufModuleSizeFunc     size_func,
@@ -28,9 +51,11 @@ begin_load (GdkPixbufModuleSizeFunc     size_func,
   context->user_data    = user_data;
   context->deccfg       = (WebPDecoderConfig){ 0 };
   context->got_header   = FALSE;
-  context->pixbuf       = NULL;
-  context->idec         = NULL;
-  context->anim_buffer  = NULL;
+  context->is_animation = FALSE;
+  context->has_alpha    = FALSE;
+  context->buffer       = NULL;
+  context->canvas_w     = 0;
+  context->canvas_h     = 0;
 
   return context;
 }
@@ -41,8 +66,7 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
   WebPContext *context = (WebPContext *) data;
   if (context->got_header == FALSE)
     {
-      gint width, height;
-      if (WebPGetInfo (buf, size, &width, &height) == FALSE)
+      if (WebPGetInfo (buf, size, &context->canvas_w, &context->canvas_h) == FALSE)
         {
           g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
                        "Could not get WebP header information");
@@ -50,20 +74,6 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
         }
 
       context->got_header = TRUE;
-
-      gint scaled_w = width;
-      gint scaled_h = height;
-
-      context->size_func (&scaled_w, &scaled_h, context->user_data);
-
-      if (scaled_w != 0 && scaled_h != 0 && (scaled_w != width || scaled_h != height))
-        {
-          context->deccfg.options.use_scaling   = TRUE;
-          context->deccfg.options.scaled_width  = scaled_w;
-          context->deccfg.options.scaled_height = scaled_h;
-          width                                 = scaled_w;
-          height                                = scaled_h;
-        }
 
       WebPBitstreamFeatures features;
       if (WebPGetFeatures (buf, size, &features) != VP8_STATUS_OK)
@@ -73,67 +83,13 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
           return FALSE;
         }
 
-      if (features.has_animation)
-        {
-          context->anim_buffer = g_byte_array_new ();
-          g_byte_array_append (context->anim_buffer, buf, size);
-          return TRUE;
-        }
-
-      context->pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, features.has_alpha,
-                                        8, width, height);
-      if (context->pixbuf == NULL)
-        {
-          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
-                       "Could not allocate GdkPixbuf");
-          return FALSE;
-        }
-
-      context->deccfg.output.colorspace = features.has_alpha ? MODE_RGBA : MODE_RGB;
-
-      guint len                                 = 0;
-      context->deccfg.output.is_external_memory = TRUE;
-      context->deccfg.output.u.RGBA.rgba
-          = gdk_pixbuf_get_pixels_with_length (context->pixbuf, &len);
-      context->deccfg.output.u.RGBA.stride = gdk_pixbuf_get_rowstride (context->pixbuf);
-      context->deccfg.output.u.RGBA.size = (size_t) len;
-      context->idec = WebPIDecode (NULL, 0, &context->deccfg);
-
-      if (context->idec == NULL)
-        {
-          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
-                       "Could not allocate WebPIDecode");
-          g_clear_object (&context->pixbuf);
-          return FALSE;
-        }
-
-      context->prepare_func (context->pixbuf, NULL, context->user_data);
+      context->has_alpha = features.has_alpha;
+      context->is_animation = features.has_animation;
+      context->buffer = g_byte_array_new ();
     }
 
-  if (context->anim_buffer)
-    {
-      g_byte_array_append (context->anim_buffer, buf, size);
-      return TRUE;
-    }
-
-  gint status = WebPIAppend (context->idec, buf, (size_t) size);
-  if (status != VP8_STATUS_OK && status != VP8_STATUS_SUSPENDED)
-    {
-      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                   "Could not decode WebP buffer chunk");
-      return FALSE;
-    }
-
-  gint last_y = 0, width = 0;
-  if (WebPIDecGetRGB (context->idec, &last_y, &width, NULL, NULL) == NULL
-      && status != VP8_STATUS_SUSPENDED)
-    {
-      g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                   "Could not get RGP data from WebP incremental decoder");
-      return FALSE;
-    }
-
-  context->update_func (context->pixbuf, 0, 0, width, last_y, context->user_data);
+  if (context->buffer)
+    g_byte_array_append (context->buffer, buf, size);
 
   return TRUE;
 }
@@ -144,10 +100,10 @@ stop_load (gpointer data, GError **error)
   WebPContext *context = (WebPContext *) data;
   gboolean     ret     = FALSE;
 
-  if (context->anim_buffer)
+  if (context->is_animation)
     {
-      GdkWebpAnimation *anim = gdk_webp_animation_new_from_bytes (context->anim_buffer, error);
-      context->anim_buffer = NULL;
+      GdkWebpAnimation *anim = gdk_webp_animation_new_from_bytes (context->buffer, error);
+      context->buffer = NULL;
 
       GdkPixbufAnimationIter *iter
           = gdk_pixbuf_animation_get_iter (GDK_PIXBUF_ANIMATION (anim), NULL);
@@ -157,32 +113,76 @@ stop_load (gpointer data, GError **error)
         {
           g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
                        "Could not get Pixbuf from WebP animation iter");
-
-          WebPFreeDecBuffer (&context->deccfg.output);
-          g_clear_pointer (&context->idec, WebPIDelete);
         }
       else
         {
-          context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
+          if (context->prepare_func)
+            context->prepare_func (pb, GDK_PIXBUF_ANIMATION (anim), context->user_data);
           ret = TRUE;
         }
 
       g_object_unref (anim);
       g_object_unref (iter);
     }
-
-  if (context->pixbuf != NULL)
+  else
     {
-      gint w = gdk_pixbuf_get_width (context->pixbuf);
-      gint h = gdk_pixbuf_get_height (context->pixbuf);
-      context->update_func (context->pixbuf, 0, 0, w, h, context->user_data);
-      ret = TRUE;
+      WebPData data = { .bytes = context->buffer->data, .size = context->buffer->len };
+      WebPMux *mux = WebPMuxCreate (&data, FALSE);
+      gchar *icc_data = NULL;
+      if (mux) {
+        WebPData icc_profile = { 0 };
+        if (WebPMuxGetChunk (mux, "ICCP", &icc_profile) == WEBP_MUX_OK && icc_profile.bytes)
+          icc_data = g_base64_encode (icc_profile.bytes, icc_profile.size);
+        g_clear_pointer(&mux, WebPMuxDelete);
+      }
+      gint width    = context->canvas_w,
+           height   = context->canvas_h,
+           scaled_w = context->canvas_w,
+           scaled_h = context->canvas_h;
+
+      if (context->size_func)
+        context->size_func (&scaled_w, &scaled_h, context->user_data);
+
+      if (scaled_w != 0 && scaled_h != 0 && (scaled_w != width || scaled_h != height)) {
+        width = scaled_w;
+        height = scaled_h;
+      }
+
+      GdkPixbuf *pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, context->has_alpha, 8, width, height);
+      if (icc_data) {
+        gdk_pixbuf_set_option (pixbuf, "icc-profile", icc_data);
+        g_clear_pointer (&icc_data, g_free);
+      }
+
+      guint pblen = 0;
+      WebPDecoderConfig config;
+      WebPInitDecoderConfig(&config);
+      config.options.use_scaling = TRUE;
+      config.options.scaled_width = width;
+      config.options.scaled_height = height;
+      config.output.is_external_memory = TRUE;
+      config.output.colorspace = context->has_alpha ? MODE_RGBA : MODE_RGB;
+      config.output.u.RGBA.rgba = gdk_pixbuf_get_pixels_with_length (pixbuf, &pblen);
+      config.output.u.RGBA.size = (gsize)pblen;
+      config.output.u.RGBA.stride = gdk_pixbuf_get_rowstride (pixbuf);
+
+      if (WebPDecode(context->buffer->data, context->buffer->len, &config) != VP8_STATUS_OK) {
+        g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED, "Could not decode WebP image");
+        g_object_unref (pixbuf);
+      } else {
+        ret = TRUE;
+      }
+
+      if (ret && context->prepare_func)
+        context->prepare_func (pixbuf, NULL, context->user_data);
+
+      if (pixbuf)
+        g_object_unref (pixbuf);
     }
 
-  g_clear_pointer (&context->idec, WebPIDelete);
-  g_clear_object (&context->pixbuf);
+  if (context->buffer)
+    g_byte_array_free (context->buffer, TRUE);
   g_free (context);
-
   return ret;
 }
 
