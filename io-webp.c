@@ -73,8 +73,6 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
           return FALSE;
         }
 
-      context->got_header = TRUE;
-
       WebPBitstreamFeatures features;
       if (WebPGetFeatures (buf, size, &features) != VP8_STATUS_OK)
         {
@@ -83,9 +81,11 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
           return FALSE;
         }
 
-      context->has_alpha = features.has_alpha;
+      context->got_header = TRUE;
+
+      context->has_alpha    = features.has_alpha;
       context->is_animation = features.has_animation;
-      context->buffer = g_byte_array_new ();
+      context->buffer       = g_byte_array_new ();
     }
 
   if (context->buffer)
@@ -100,7 +100,7 @@ stop_load (gpointer data, GError **error)
   WebPContext *context = (WebPContext *) data;
   gboolean     ret     = FALSE;
 
-  if (context->is_animation)
+  if (context->got_header && context->is_animation)
     {
       GdkWebpAnimation *anim = gdk_webp_animation_new_from_bytes (context->buffer, error);
       context->buffer = NULL;
@@ -124,54 +124,61 @@ stop_load (gpointer data, GError **error)
       g_object_unref (anim);
       g_object_unref (iter);
     }
-  else
+  else if (context->got_header)
     {
       WebPData data = { .bytes = context->buffer->data, .size = context->buffer->len };
-      WebPMux *mux = WebPMuxCreate (&data, FALSE);
-      gchar *icc_data = NULL;
-      if (mux) {
-        WebPData icc_profile = { 0 };
-        if (WebPMuxGetChunk (mux, "ICCP", &icc_profile) == WEBP_MUX_OK && icc_profile.bytes)
-          icc_data = g_base64_encode (icc_profile.bytes, icc_profile.size);
-        g_clear_pointer(&mux, WebPMuxDelete);
-      }
-      gint width    = context->canvas_w,
-           height   = context->canvas_h,
-           scaled_w = context->canvas_w,
-           scaled_h = context->canvas_h;
+      WebPMux *mux      = WebPMuxCreate (&data, FALSE);
+      gchar   *icc_data = NULL;
+      if (mux)
+        {
+          WebPData icc_profile = { 0 };
+          if (WebPMuxGetChunk (mux, "ICCP", &icc_profile) == WEBP_MUX_OK
+              && icc_profile.bytes)
+            icc_data = g_base64_encode (icc_profile.bytes, icc_profile.size);
+          g_clear_pointer (&mux, WebPMuxDelete);
+        }
+      gint width = context->canvas_w, height = context->canvas_h,
+           scaled_w = context->canvas_w, scaled_h = context->canvas_h;
 
       if (context->size_func)
         context->size_func (&scaled_w, &scaled_h, context->user_data);
 
-      if (scaled_w != 0 && scaled_h != 0 && (scaled_w != width || scaled_h != height)) {
-        width = scaled_w;
-        height = scaled_h;
-      }
+      if (scaled_w != 0 && scaled_h != 0 && (scaled_w != width || scaled_h != height))
+        {
+          width  = scaled_w;
+          height = scaled_h;
+        }
 
-      GdkPixbuf *pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, context->has_alpha, 8, width, height);
-      if (icc_data) {
-        gdk_pixbuf_set_option (pixbuf, "icc-profile", icc_data);
-        g_clear_pointer (&icc_data, g_free);
-      }
+      GdkPixbuf *pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB,
+                                          context->has_alpha, 8, width, height);
+      if (icc_data)
+        {
+          gdk_pixbuf_set_option (pixbuf, "icc-profile", icc_data);
+          g_clear_pointer (&icc_data, g_free);
+        }
 
-      guint pblen = 0;
+      guint             pblen = 0;
       WebPDecoderConfig config;
-      WebPInitDecoderConfig(&config);
-      config.options.use_scaling = TRUE;
-      config.options.scaled_width = width;
-      config.options.scaled_height = height;
+      WebPInitDecoderConfig (&config);
+      config.options.use_scaling       = TRUE;
+      config.options.scaled_width      = width;
+      config.options.scaled_height     = height;
       config.output.is_external_memory = TRUE;
       config.output.colorspace = context->has_alpha ? MODE_RGBA : MODE_RGB;
       config.output.u.RGBA.rgba = gdk_pixbuf_get_pixels_with_length (pixbuf, &pblen);
-      config.output.u.RGBA.size = (gsize)pblen;
+      config.output.u.RGBA.size   = (gsize) pblen;
       config.output.u.RGBA.stride = gdk_pixbuf_get_rowstride (pixbuf);
 
-      if (WebPDecode(context->buffer->data, context->buffer->len, &config) != VP8_STATUS_OK) {
-        g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED, "Could not decode WebP image");
-        g_object_unref (pixbuf);
-      } else {
-        ret = TRUE;
-      }
+      if (WebPDecode (context->buffer->data, context->buffer->len, &config) != VP8_STATUS_OK)
+        {
+          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                       "Could not decode WebP image");
+          g_object_unref (pixbuf);
+        }
+      else
+        {
+          ret = TRUE;
+        }
 
       if (ret && context->prepare_func)
         context->prepare_func (pixbuf, NULL, context->user_data);

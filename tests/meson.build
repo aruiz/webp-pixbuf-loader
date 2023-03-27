@@ -8,6 +8,7 @@ t_save       = executable('t_save',        't_save.c',       dependencies : [gdk
 t_icc        = executable('t_icc',         't_icc.c',        dependencies : [gdkpb, webp, webpdemux, webpmux])
 t_null_error = executable('t_null_error',  't_null_error.c', dependencies : [gdkpb, webp, webpdemux])
 t_scaled     = executable('t_scaled',      't_scaled.c',     dependencies : [gdkpb, webp, webpdemux])
+t_jpeg       = executable('t_jpeg',        't_jpeg.c',       dependencies : [gdkpb, webp, webpdemux])
 
 loaders_data = configuration_data()
 loaders_data.set('MODULE_PATH', fs.as_posix(pbl_webp.full_path()))
@@ -26,3 +27,4 @@ test('save data',         t_save, env : test_env + [ test_file_base / 't2.webp']
 test('icc data',           t_icc, env : test_env + [ test_file_base / 't2.webp'])
 test('NULL GError', t_null_error, env : test_env + [ test_file_base / 't2.webp'])
 test('scaled image',    t_scaled, env : test_env + [ test_file_base / 't2.webp', 'TEST_FILE_ANIM=' + meson.current_source_dir() / 'data' / 't3.webp'])
+test('jpeg with .webp extension', t_jpeg, env : test_env + [ test_file_base / 'test_jpeg_as_webp.webp'])
