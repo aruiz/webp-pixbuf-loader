@@ -31,7 +31,8 @@ test_webp_icc_output (guchar *buffer, gsize buf_size, const gchar *base64_string
 }
 
 void
-test_webp_icc_read (const gchar *path) {
+test_webp_icc_read (const gchar *path)
+{
   GError *error = NULL;
 
   GdkPixbuf *icc_pixbuf = gdk_pixbuf_new_from_file (path, &error);
@@ -39,7 +40,7 @@ test_webp_icc_read (const gchar *path) {
     g_error ("%s", error->message);
   g_assert (icc_pixbuf != NULL);
 
-  const gchar* icc_option = gdk_pixbuf_get_option (icc_pixbuf, "icc-profile");
+  const gchar *icc_option = gdk_pixbuf_get_option (icc_pixbuf, "icc-profile");
   g_assert (icc_option != NULL);
   g_assert_cmpstr ("MQo=", ==, icc_option);
 
