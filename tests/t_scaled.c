@@ -19,6 +19,7 @@ main ()
   g_assert_cmpint (gdk_pixbuf_get_width (pixbuf), ==, 40);
   g_assert_cmpint (gdk_pixbuf_get_height (pixbuf), ==, 40);
 
-  g_clear_pointer (&env, g_strfreev);
   g_object_unref (pixbuf);
+
+  g_clear_pointer (&env, g_strfreev);
 }
