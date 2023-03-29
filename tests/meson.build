@@ -9,7 +9,7 @@ t_icc        = executable('t_icc',         't_icc.c',        dependencies : [gdk
 t_null_error = executable('t_null_error',  't_null_error.c', dependencies : [gdkpb, webp, webpdemux])
 t_scaled     = executable('t_scaled',      't_scaled.c',     dependencies : [gdkpb, webp, webpdemux])
 t_jpeg       = executable('t_jpeg',        't_jpeg.c',       dependencies : [gdkpb, webp, webpdemux])
-t_large      = executable('t_large',       't_large.c',      dependencies : [gdkpb, webp, webpdemux])
+t_large      = executable('t_large',       't_large.c',      dependencies : [gdkpb, webp, webpdemux, gio])
 
 loaders_data = configuration_data()
 loaders_data.set('MODULE_PATH', fs.as_posix(pbl_webp.full_path()))

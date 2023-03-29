@@ -28,13 +28,10 @@ typedef struct
   GdkPixbufModuleUpdatedFunc  update_func;
   GdkPixbufModulePreparedFunc prepare_func;
   gpointer                    user_data;
-  WebPDecoderConfig           deccfg;
   gboolean                    got_header;
   gboolean                    is_animation;
   gboolean                    has_alpha;
   GByteArray                 *buffer;
-  WebPIDecoder               *idec;
-  GdkPixbuf                  *pb;
   gint                        width;
   gint                        height;
 } WebPContext;
@@ -51,13 +48,10 @@ begin_load (GdkPixbufModuleSizeFunc     size_func,
   context->prepare_func = prepare_func;
   context->update_func  = update_func;
   context->user_data    = user_data;
-  context->deccfg       = (WebPDecoderConfig){ 0 };
   context->got_header   = FALSE;
   context->is_animation = FALSE;
   context->has_alpha    = FALSE;
   context->buffer       = NULL;
-  context->idec         = NULL;
-  context->pb           = NULL;
   context->width        = 0;
   context->height       = 0;
 
@@ -116,88 +110,11 @@ load_increment (gpointer data, const guchar *buf, guint size, GError **error)
       context->has_alpha    = features.has_alpha;
       context->is_animation = features.has_animation;
 
-      if (! context->is_animation)
-        {
-          gchar   *icc_data = NULL;
-          WebPData wp_data  = { .bytes = buf, .size = size };
-          WebPMux *mux      = WebPMuxCreate (&wp_data, FALSE);
-          if (mux)
-            {
-              WebPData icc_profile = { 0 };
-              if (WebPMuxGetChunk (mux, "ICCP", &icc_profile) == WEBP_MUX_OK
-                  && icc_profile.bytes)
-                icc_data = g_base64_encode (icc_profile.bytes, icc_profile.size);
-              g_clear_pointer (&mux, WebPMuxDelete);
-            }
-
-          context->pb = gdk_pixbuf_new (GDK_COLORSPACE_RGB, context->has_alpha,
-                                        8, context->width, context->height);
-
-          if (! context->pb)
-            {
-              g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                           "Could not allocate GdkPixbuf");
-              return FALSE;
-            }
-
-          if (icc_data)
-            {
-              gdk_pixbuf_set_option (context->pb, "icc-profile", icc_data);
-              g_clear_pointer (&icc_data, g_free);
-            }
-
-          WebPDecoderConfig config;
-          init_dec_config (&config, context->pb);
-
-          context->idec = WebPIDecode (NULL, 0, &config);
-
-          if (! context->idec)
-            {
-              g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                           "Could not allocate WebP incremental decoder");
-              return FALSE;
-            }
-
-          if (context->prepare_func && context->pb)
-            {
-              context->prepare_func (context->pb, NULL, context->user_data);
-            }
-        }
-      else
-        {
-          context->buffer = g_byte_array_new ();
-        }
+      context->buffer = g_byte_array_new ();
     }
 
   if (context->buffer)
-    {
-      g_byte_array_append (context->buffer, buf, size);
-    }
-  else if (context->pb && context->idec)
-    {
-      VP8StatusCode status = WebPIAppend (context->idec, buf, (size_t) size);
-      if (status != VP8_STATUS_OK && status != VP8_STATUS_SUSPENDED)
-        {
-          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                       "Could not incrementally decode WebP stream chunk");
-          return FALSE;
-        }
-
-      gint last_y = 0;
-      gint w      = 0;
-      if (WebPIDecGetRGB (context->idec, &last_y, &w, NULL, NULL) == NULL
-          && status != VP8_STATUS_SUSPENDED)
-        {
-          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                       "Bad inputs to WebP decoder.");
-          return FALSE;
-        }
-
-      if (status != VP8_STATUS_SUSPENDED && context->update_func)
-        {
-          context->update_func (context->pb, 0, 0, w, last_y, context->user_data);
-        }
-    }
+    g_byte_array_append (context->buffer, buf, size);
 
   return TRUE;
 }
@@ -232,9 +149,55 @@ stop_load (gpointer data, GError **error)
       g_clear_object (&iter);
       g_clear_object (&anim);
     }
-  else if (context->got_header && context->pb)
+  else if (context->got_header && context->buffer)
     {
-      ret = TRUE;
+      gchar   *icc_data = NULL;
+      WebPData wp_data  = { .bytes = context->buffer->data,
+                            .size  = context->buffer->len };
+      WebPMux *mux      = WebPMuxCreate (&wp_data, FALSE);
+      if (mux)
+        {
+          WebPData icc_profile = { 0 };
+          if (WebPMuxGetChunk (mux, "ICCP", &icc_profile) == WEBP_MUX_OK
+              && icc_profile.bytes)
+            icc_data = g_base64_encode (icc_profile.bytes, icc_profile.size);
+          g_clear_pointer (&mux, WebPMuxDelete);
+        }
+
+      GdkPixbuf *pb = gdk_pixbuf_new (GDK_COLORSPACE_RGB, context->has_alpha, 8,
+                                      context->width, context->height);
+
+      if (! pb)
+        {
+          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                       "Could not allocate GdkPixbuf");
+          return FALSE;
+        }
+
+      if (icc_data)
+        {
+          gdk_pixbuf_set_option (pb, "icc-profile", icc_data);
+          g_clear_pointer (&icc_data, g_free);
+        }
+
+      WebPDecoderConfig config;
+      init_dec_config (&config, pb);
+
+      VP8StatusCode status = WebPDecode (context->buffer->data,
+                                         context->buffer->len, &config);
+      if (status == VP8_STATUS_OK)
+        {
+          if (context->prepare_func)
+            context->prepare_func (pb, NULL, context->user_data);
+
+          g_clear_object (&pb);
+
+          ret = TRUE;
+        }
+      else {
+        g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                          "WebP decoder failed with VP8 status code: %d", status);
+      }
     }
 
   if (context->buffer)
@@ -243,8 +206,6 @@ stop_load (gpointer data, GError **error)
       context->buffer = NULL;
     }
 
-  g_clear_object (&context->pb);
-  g_clear_pointer (&context->idec, WebPIDelete);
   g_clear_pointer (&context, g_free);
   return ret;
 }
