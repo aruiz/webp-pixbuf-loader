@@ -18,4 +18,4 @@ jobs:
       - run: ninja -C build
       - run: ninja -C build scan-build
       - run: meson test -C build --print-errorlogs
-      - run: meson test -C build --wrapper 'valgrind --leak-check=full --undef-value-errors=no --error-exitcode=1'
+      - run: meson test -C build --wrapper 'valgrind --leak-check=full --error-exitcode=1'
