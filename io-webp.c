@@ -176,6 +176,9 @@ stop_load (gpointer data, GError **error)
           return FALSE;
         }
 
+      if (context->prepare_func)
+        context->prepare_func (pb, NULL, context->user_data);
+
       if (icc_data)
         {
           gdk_pixbuf_set_option (pb, "icc-profile", icc_data);
@@ -189,12 +192,8 @@ stop_load (gpointer data, GError **error)
                                          context->buffer->len, &config);
       if (status == VP8_STATUS_OK)
         {
-          if (context->prepare_func)
-            context->prepare_func (pb, NULL, context->user_data);
           if (context->update_func)
             context->update_func (pb, 0, 0, context->width, context->height, context->user_data);
-
-          g_clear_object (&pb);
 
           ret = TRUE;
         }
@@ -202,6 +201,8 @@ stop_load (gpointer data, GError **error)
         g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
                           "WebP decoder failed with VP8 status code: %d", status);
       }
+
+      g_clear_object (&pb);
     }
 
   if (context->buffer)
