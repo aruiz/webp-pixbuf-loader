@@ -7,9 +7,9 @@ if gdk_pb_moddir == ''
   gdk_pb_moddir = gdkpb.get_variable(pkgconfig: 'gdk_pixbuf_moduledir', pkgconfig_define: ['prefix', get_option('prefix')])
 endif
 
-webp = dependency('libwebp', version: '>0.4.3')
-webpdemux = dependency('libwebpdemux', version: '>0.4.3')
-webpmux = dependency('libwebpmux', version: '>0.4.3')
+webp = dependency('libwebp', version: '>1.3.2')
+webpdemux = dependency('libwebpdemux', version: '>1.3.2')
+webpmux = dependency('libwebpmux', version: '>1.3.2')
 
 pbl_webp = shared_module('pixbufloader-webp',
                          sources: ['io-webp.c', 'io-webp-anim.c', 'io-webp-anim-iter.c'],
