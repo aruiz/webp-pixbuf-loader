@@ -12,7 +12,7 @@ jobs:
   Build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: brew update
       - run: brew install webp gdk-pixbuf meson ninja pkg-config
       - run: meson setup build
