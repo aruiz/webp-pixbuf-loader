@@ -10,6 +10,7 @@ t_null_error = executable('t_null_error',  't_null_error.c', dependencies : [gdk
 t_scaled     = executable('t_scaled',      't_scaled.c',     dependencies : [gdkpb, webp, webpdemux])
 t_jpeg       = executable('t_jpeg',        't_jpeg.c',       dependencies : [gdkpb, webp, webpdemux])
 t_large      = executable('t_large',       't_large.c',      dependencies : [gdkpb, webp, webpdemux, gio])
+t_signals    = executable('t_signals',     't_signals.c',    dependencies : [gdkpb, webp, webpdemux, gio])
 
 loaders_data = configuration_data()
 loaders_data.set('MODULE_PATH', fs.as_posix(pbl_webp.full_path()))
@@ -30,3 +31,4 @@ test('NULL GError', t_null_error, env : test_env + [ test_file_base / 't2.webp']
 test('large file',       t_large, env : test_env + [ test_file_base / 't_large.webp'])
 test('scaled image',    t_scaled, env : test_env + [ test_file_base / 't2.webp', 'TEST_FILE_ANIM=' + meson.current_source_dir() / 'data' / 't3.webp'])
 test('jpeg with .webp extension', t_jpeg, env : test_env + [ test_file_base / 'test_jpeg_as_webp.webp'])
+test('signal handling',    t_signals, env : test_env + [ test_file_base / 't2.webp'])
