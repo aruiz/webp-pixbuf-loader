@@ -194,10 +194,11 @@ stop_load (gpointer data, GError **error)
 
           ret = TRUE;
         }
-      else {
-        g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
-                          "WebP decoder failed with VP8 status code: %d", status);
-      }
+      else
+        {
+          g_set_error (error, GDK_PIXBUF_ERROR, GDK_PIXBUF_ERROR_FAILED,
+                       "WebP decoder failed with VP8 status code: %d", status);
+        }
     }
 
   if (context->buffer)
