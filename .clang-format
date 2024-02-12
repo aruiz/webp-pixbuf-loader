@@ -42,5 +42,4 @@ PenaltyBreakString: 60
 PenaltyExcessCharacter: 1
 # Strings are more often longer by usage, so let's give these slightly
 # more space to breath.
-PenaltyBreakString: 60
 PenaltyReturnTypeOnItsOwnLine: 50
