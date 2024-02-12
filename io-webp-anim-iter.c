@@ -109,8 +109,15 @@ timeval_sub_in_millis (const GTimeVal *a, const GTimeVal *b)
 static gboolean
 advance (GdkPixbufAnimationIter *self, const GTimeVal *time)
 {
+  GTimeVal curr_time = { 0 };
   GdkWebpAnimationIterPrivate *priv = gdk_webp_animation_iter_get_instance_private (
       GDK_WEBP_ANIMATION_ITER (self));
+
+  if (time == NULL)
+    {
+      g_get_current_time (&curr_time);
+      time = &curr_time;
+    }
 
   // time needs to be later than priv->curr_time
   if (time->tv_sec <= priv->curr_time.tv_sec && time->tv_usec <= priv->curr_time.tv_usec)
