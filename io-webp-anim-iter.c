@@ -246,6 +246,9 @@ gdk_webp_animation_new_from_buffer_and_time (const GByteArray *buf,
           memcpy (pb_row, data_row, data_stride);
         }
 
+      if (timestamp <= loop_length)
+        timestamp = loop_length + 50;
+
       Frame f = { .pb = pb, .length = timestamp - loop_length };
       g_array_append_vals (priv->frames, &f, 1);
 
