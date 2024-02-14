@@ -1,4 +1,4 @@
-name: WebP Pixbuf CI [Ubuntu]
+name: WebP Pixbuf CI [Ubuntu/Fedora]
 
 on:
   push:
@@ -17,6 +17,19 @@ jobs:
       - uses: actions/checkout@v4
       - run: apt update
       - run: apt install -y ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev valgrind clang clang-tools
+      - run: mkdir build
+      - run: meson build
+      - run: ninja -C build
+      - run: ninja -C build scan-build
+      - run: meson test -C build --print-errorlogs
+      - run: meson test -C build --wrapper 'valgrind --leak-check=full --error-exitcode=1'
+  build_fedora:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:rawhide
+    steps:
+      - uses: actions/checkout@v4
+      - run: dnf -y install ninja-build meson libwebp-devel gdk-pixbuf2-devel valgrind clang clang-analyzer
       - run: mkdir build
       - run: meson build
       - run: ninja -C build
