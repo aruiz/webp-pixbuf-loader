@@ -9,12 +9,14 @@ on:
       - mainline
 
 jobs:
-  Build:
+  build_ubuntu:
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:noble
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt update
-      - run: sudo apt install ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev valgrind
+      - run: apt update
+      - run: apt install -y ninja-build meson libwebp-dev libgdk-pixbuf2.0-dev valgrind clang clang-tools
       - run: mkdir build
       - run: meson build
       - run: ninja -C build
