@@ -1,4 +1,4 @@
-project('webp-pixbuf-loader', 'c', version: '0.2.6', meson_version: '>=0.54')
+project('webp-pixbuf-loader', 'c', version: '0.2.7', meson_version: '>=0.54')
 cc = meson.get_compiler('c')
 gio = dependency('gio-2.0', method: 'pkg-config')
 gdkpb = dependency('gdk-pixbuf-2.0', version: '>2.22.0', method: 'pkg-config')
