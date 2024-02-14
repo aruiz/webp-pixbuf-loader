@@ -55,7 +55,7 @@ main (gint argc, gchar **argv)
   GError         *error = NULL;
   gsize           pixbuf_size;
   guchar         *pixbuf_data = NULL;
-  SignalsCounters counters    = { 0 };
+  SignalsCounters counters = { 0 };
 
   GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
 
