@@ -11,6 +11,8 @@ on:
 jobs:
   Build:
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:noble
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt update
