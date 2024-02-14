@@ -51,11 +51,11 @@ size_prepared_cb (GdkPixbufLoader *self, gint width, gint height, gpointer user_
 gint
 main (gint argc, gchar **argv)
 {
-  gchar          **env = g_get_environ ();
-  GError          *error = NULL;
-  gsize            pixbuf_size;
-  guchar          *pixbuf_data = NULL;
-  SignalsCounters  counters = { 0 };
+  gchar         **env   = g_get_environ ();
+  GError         *error = NULL;
+  gsize           pixbuf_size;
+  guchar         *pixbuf_data = NULL;
+  SignalsCounters counters    = { 0 };
 
   GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
 
