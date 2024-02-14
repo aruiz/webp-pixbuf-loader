@@ -29,10 +29,11 @@ jobs:
       image: fedora:rawhide
     steps:
       - uses: actions/checkout@v4
-      - run: dnf -y install ninja-build meson libwebp-devel gdk-pixbuf2-devel valgrind clang clang-analyzer
+      - run: dnf -y install ninja-build meson libwebp-devel gdk-pixbuf2-devel valgrind clang clang-analyzer clang-tools-extra
       - run: mkdir build
       - run: meson build
       - run: ninja -C build
       - run: ninja -C build scan-build
       - run: meson test -C build --print-errorlogs
       - run: meson test -C build --wrapper 'valgrind --leak-check=full --error-exitcode=1'
+      - run: clang-format -n *.[ch] tests/*.[ch]
