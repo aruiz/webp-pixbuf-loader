@@ -17,8 +17,8 @@ jobs:
       - run: brew update
 
       - run: |
-          # https://github.com/actions/runner-images/issues/8838#issuecomment-1817486924
-          brew link --overwrite python@3.12
+          # fix `brew link python@3.12` issue
+          rm -rf /usr/local/bin/2to3-3.12
 
           brew install webp gdk-pixbuf meson ninja pkg-config
 
