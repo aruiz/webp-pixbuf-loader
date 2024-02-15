@@ -13,8 +13,26 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: brew update
-      - run: brew install webp gdk-pixbuf meson ninja pkg-config
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew update
+
+          # fix `brew link python@3.12` issue
+
+          rm -f /usr/local/bin/2to3
+          rm -f /usr/local/bin/idle3
+          rm -f /usr/local/bin/pydoc3
+          rm -f /usr/local/bin/python3
+          rm -f /usr/local/bin/python3-config
+          rm -f /usr/local/bin/2to3-3.12
+          rm -f /usr/local/bin/idle3.12
+          rm -f /usr/local/bin/pydoc3.12
+          rm -f /usr/local/bin/python3.12
+          rm -f /usr/local/bin/python3.12-config
+
+          brew install webp gdk-pixbuf meson ninja pkg-config
+
       - run: meson setup build
       - run: meson compile -C build --verbose
       - run: meson test -C build --print-errorlogs
