@@ -13,8 +13,15 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - run: brew update
-      - run: brew install webp gdk-pixbuf meson ninja pkg-config
+
+      - run: |
+          # https://github.com/actions/runner-images/issues/8838#issuecomment-1817486924
+          brew link --overwrite python@3.12
+
+          brew install webp gdk-pixbuf meson ninja pkg-config
+
       - run: meson setup build
       - run: meson compile -C build --verbose
       - run: meson test -C build --print-errorlogs
